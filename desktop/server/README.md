@@ -5,6 +5,11 @@ self-contained Node 22 bundle: it terminates the PRAETOR/1 session, opens ordina
 outbound TCP sockets for each multiplexed `CONNECT`, and never creates a TUN
 device or changes IP forwarding.
 
+A native Rust implementation lives in
+[`../../praetor-rs/src/egress.rs`](../../praetor-rs/src/egress.rs) and builds as
+`praetor-egress`. It reads the same base64 server key and speaks the same egress
+frames, so either implementation works with the existing client.
+
 ## Files
 
 | File | Purpose |

@@ -42,7 +42,7 @@ PRAETOR is two things that share one protocol:
 | **PRAETOR Command** | Windows desktop control plane: profile switching, real TCP egress, Windows system-proxy management, session telemetry, local MCP tools, and an agent fabric. | [`desktop/`](desktop/README.md) |
 | **PRAETOR/1** | Fixed-cell authenticated transport with a hybrid post-quantum handshake, SIV-based record protection, capability enforcement, and cross-language test vectors. | [`praetor/`](praetor/README.md) |
 | **PRAETOR Rust** | Byte-compatible Rust implementation with zero-copy channels, FAST/BOLT profiles, and the experimental PMARINE fixed-cell channel. | [`praetor-rs/`](praetor-rs/README.md) |
-| **PRAETOR egress** | Self-contained Node exit that terminates a PRAETOR session and forwards multiplexed TCP streams. | [`desktop/server/`](desktop/server/README.md) |
+| **PRAETOR egress** | Self-contained exit that terminates a PRAETOR session and forwards multiplexed TCP streams. The Node and Rust implementations share one frame protocol. | [`desktop/server/`](desktop/server/README.md) · [`praetor-rs/src/egress.rs`](praetor-rs/src/egress.rs) |
 
 The desktop app does **not** speak WireGuard. It does not create a TUN device, change IP forwarding, or install a kernel driver. It opens a pinned PRAETOR/1 TCP session, exposes a local SOCKS5 listener, and points the Windows system proxy at it while connected.
 
@@ -383,7 +383,7 @@ This section is for a Linux host. The egress is a userspace TCP forwarder: it do
 ### Host requirements
 
 - Linux with systemd and nftables.
-- Node.js 22 at `/opt/praetor-egress/node/bin/node` (or edit the service unit).
+- Either the Node.js 22 bundle below or the native Rust `praetor-egress` binary (no Node runtime required).
 - Root access for the service and ingress rule.
 - Inbound TCP `9443` allowed.
 
@@ -429,6 +429,18 @@ Expected output:
 ```text
 dist/praetor-egress.mjs
 ```
+
+### Step 2b — Native Rust exit (optional)
+
+The same exit is available as a Rust binary in `praetor-rs` and speaks the same egress frames:
+
+```bash
+cd praetor-rs
+./cargo.sh build --release --bin praetor-egress
+./target/release/praetor-egress --key ../praetor/server.key --host 0.0.0.0 --port 9443
+```
+
+It accepts `--cell-size`, `--max-message-mib`, `--connect-timeout-ms` and `--quiet`, and prints a JSON startup line. Use the same `server.key` you generated above. This path needs no Node installation on the exit host; skip the Node bundle and run the binary under your own service manager.
 
 ### Step 3 — Deploy the service
 
@@ -491,7 +503,7 @@ The response must show `"ip": "104.251.218.227"` for the default Dallas exit, or
 - The server does **not** authenticate individual clients. Anyone who has the public key and can reach TCP `9443` can use the exit.
 - Keep the public key distribution private, add a network allowlist, or add a pre-shared admission check before exposing an exit to untrusted users.
 - The egress supports **PSEAL only** today. FAST, BOLT, and PMARINE are Rust-side channels and are not negotiated by this server.
-- Run the Node process as an unprivileged user once the nftables rule exists; the service unit uses root because the reference host layout does.
+- Run the egress process as an unprivileged user once the nftables rule exists; the reference service unit uses root because the reference host layout does.
 
 ---
 

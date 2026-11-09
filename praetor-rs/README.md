@@ -3,7 +3,8 @@
 Byte-compatible with the JavaScript reference in `../praetor`. The crate contains
 PSEAL/1, PRAETOR/WIRE, PRAETOR/FAST, PRAETOR/BOLT, PRAETOR/PMARINE (experimental
 PSEAL/2 envelope and fixed-cell channel on AEGIS-256), PRAETOR-HS/1 (X25519 +
-ML-KEM-768), PRAETOR/CONTAINER and the PRAETOR/GUARD capability layer.
+ML-KEM-768), PRAETOR/CONTAINER, the PRAETOR/GUARD capability layer and a
+native multiplexed TCP egress server.
 
 ## Toolchain
 
@@ -45,6 +46,26 @@ padded plaintext; pass `--pad` to `open` to strip it. Container encryption
 stores the real length in the authenticated header, so `decrypt` always
 truncates padding automatically.
 
+## Egress server
+
+`praetor-egress` is a native exit that terminates PRAETOR/1 sessions and
+forwards the multiplexed TCP streams. It uses the same 5-byte egress frame
+protocol as `praetor/bin/praetor-egress.js`, so the existing Node proxy and
+desktop client can use a Rust exit without changes.
+
+The key file is the same base64 X-Wing server secret key used by the Node
+exit (2,432 decoded bytes):
+
+```bash
+./cargo.sh run --release --bin praetor-egress -- \
+  --key /path/to/server.key --host 0.0.0.0 --port 9443
+```
+
+It prints a JSON startup line and logs each session. Options: `--cell-size`
+(default 1024), `--max-message-mib` (64), `--connect-timeout-ms` (10000) and
+`--quiet`. The exit is PSEAL-only, like the Node implementation, and does not
+authenticate individual clients.
+
 ## Tests
 
 * `tests/vectors.rs` — byte-for-byte AEAD, Padmé and Shamir vectors, plus
@@ -53,8 +74,12 @@ truncates padding automatically.
   container roundtrip/truncation, policy binding, lockout, audit-chain edit
   detection, Shamir and PoW.
 
-Current status: `41 passed` (9 roundtrip + 5 vectors + 4 fast + 6 bolt + 17
-pmarine), release build. The roundtrip tests include atomic file decryption and single-use
+* `tests/egress.rs` — Rust egress server against a local echo target: full
+  handshake, CONNECT/OK, 20 KB DATA fragmentation/reassembly, CLOSE, and a
+  refused target returning ERROR without killing the session.
+
+Current status: `46 passed` (9 roundtrip + 5 vectors + 4 fast + 6 bolt + 17
+pmarine + 4 egress unit + 1 egress integration), release build. The roundtrip tests include atomic file decryption and single-use
 admission tickets: a truncated container must not clobber the destination or
 leave partial plaintext. The fast, bolt and pmarine tests cover fragmentation,
 both calling conventions, tamper rejection, replay rejection, padding cells,
@@ -92,6 +117,21 @@ to libcrux's AVX2 implementation and reusing cached X25519 public keys in
 decapsulation; X25519 DH is what remains. See
 `../praetor/docs/BOLT.md` and `../praetor/docs/FAST.md` for the tradeoffs and
 `../praetor/docs/BENCHMARKS.md` for methodology.
+
+### AEGIS lane variants
+
+`pmarine-aegis-bench` measures AEGIS-256, AEGIS-256X2 and AEGIS-256X4 through
+PMARINE's SIV envelope and fixed-cell channel, alongside BOLT, and prints JSON:
+
+```bash
+./cargo.sh run --release --bin pmarine-aegis-bench
+```
+
+On this machine (i9-14900HX, VAES/AVX2), the parallel lanes do not close the
+BOLT gap: at 1 KiB the channel is 0.15–0.16× BOLT for all three variants, and at
+60 KB 0.16–0.17×. The serial SIV HMAC dominates the per-cell cost; X2/X4 only
+speed up the AEGIS portion. PMARINE remains a stronger envelope, not a BOLT
+competitor.
 
 ## Security notes
 

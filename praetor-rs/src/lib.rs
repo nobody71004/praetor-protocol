@@ -6,6 +6,7 @@
 pub mod aead;
 pub mod bolt;
 pub mod container;
+pub mod egress;
 pub mod error;
 pub mod fast;
 pub mod guard;

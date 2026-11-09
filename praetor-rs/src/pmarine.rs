@@ -15,6 +15,8 @@
 use std::collections::{HashSet, VecDeque};
 
 use aegis::aegis256::Aegis256;
+use aegis::aegis256x2::Aegis256X2;
+use aegis::aegis256x4::Aegis256X4;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::error::{Error, Result};
@@ -41,6 +43,69 @@ const LABEL_INFO: &[u8] = b"pmarine";
 const LABEL_SIV: &[u8] = b"PMARINE/1/siv";
 const LABEL_AEAD: &[u8] = b"PMARINE/1/aead";
 const LABEL_CHANNEL: &[u8] = b"PRAETOR/PMARINE/1";
+
+/// AEGIS-256 lane variants.
+///
+/// All three keep PMARINE's 32-byte SIV, 32-byte tag and envelope shape, but
+/// produce different ciphertext, so they are not wire-compatible with each
+/// other. Only [`AegisVariant::Aegis256`] is used by the public PMARINE
+/// profile; X2 and X4 exist for benchmarking (and future profiles) on CPUs
+/// with VAES/AVX2.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AegisVariant {
+    Aegis256,
+    Aegis256X2,
+    Aegis256X4,
+}
+
+impl AegisVariant {
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Aegis256 => "aegis256",
+            Self::Aegis256X2 => "aegis256x2",
+            Self::Aegis256X4 => "aegis256x4",
+        }
+    }
+}
+
+fn aead_seal(
+    variant: AegisVariant,
+    key: &[u8; 32],
+    nonce: &[u8; 32],
+    buf: &mut [u8],
+    ad: &[u8],
+) -> [u8; TAG_BYTES] {
+    match variant {
+        AegisVariant::Aegis256 => Aegis256::<TAG_BYTES>::new(key, nonce).encrypt_in_place(buf, ad),
+        AegisVariant::Aegis256X2 => {
+            Aegis256X2::<TAG_BYTES>::new(key, nonce).encrypt_in_place(buf, ad)
+        }
+        AegisVariant::Aegis256X4 => {
+            Aegis256X4::<TAG_BYTES>::new(key, nonce).encrypt_in_place(buf, ad)
+        }
+    }
+}
+
+fn aead_open(
+    variant: AegisVariant,
+    key: &[u8; 32],
+    nonce: &[u8; 32],
+    buf: &mut [u8],
+    tag: &[u8; TAG_BYTES],
+    ad: &[u8],
+) -> bool {
+    match variant {
+        AegisVariant::Aegis256 => Aegis256::<TAG_BYTES>::new(key, nonce)
+            .decrypt_in_place(buf, tag, ad)
+            .is_ok(),
+        AegisVariant::Aegis256X2 => Aegis256X2::<TAG_BYTES>::new(key, nonce)
+            .decrypt_in_place(buf, tag, ad)
+            .is_ok(),
+        AegisVariant::Aegis256X4 => Aegis256X4::<TAG_BYTES>::new(key, nonce)
+            .decrypt_in_place(buf, tag, ad)
+            .is_ok(),
+    }
+}
 
 #[derive(Clone, Zeroize, ZeroizeOnDrop)]
 pub struct PmarineKey {
@@ -77,24 +142,39 @@ impl PmarineKey {
     }
 
     /// Seal with a caller-supplied nonce; `None` selects deterministic mode.
-    pub fn seal(
+    pub fn seal(&self, pt: &[u8], aad: &[u8], nonce: Option<[u8; NONCE_BYTES]>) -> Result<Vec<u8>> {
+        self.seal_with_variant(pt, aad, nonce, AegisVariant::Aegis256)
+    }
+
+    /// Seal with an explicit AEGIS-256 lane variant.
+    ///
+    /// The key schedule, SIV and envelope layout are unchanged; only the AEGIS
+    /// variant differs. Envelopes from different variants do not
+    /// authenticate against each other. Intended for benchmarks and future
+    /// profiles, not for negotiated traffic.
+    pub fn seal_with_variant(
         &self,
         pt: &[u8],
         aad: &[u8],
         nonce: Option<[u8; NONCE_BYTES]>,
+        variant: AegisVariant,
     ) -> Result<Vec<u8>> {
         check_len(pt.len(), aad.len())?;
         let nonce_bytes: &[u8] = nonce.as_ref().map(|n| n.as_slice()).unwrap_or(&[]);
         let siv = self.siv(nonce_bytes, aad, pt);
 
-        let mut out =
-            Vec::with_capacity(nonce_bytes.len() + SIV_BYTES + pt.len() + TAG_BYTES);
+        let mut out = Vec::with_capacity(nonce_bytes.len() + SIV_BYTES + pt.len() + TAG_BYTES);
         out.extend_from_slice(nonce_bytes);
         out.extend_from_slice(&siv);
         let body_start = out.len();
         out.extend_from_slice(pt);
-        let tag = Aegis256::<TAG_BYTES>::new(&self.k_enc, &siv)
-            .encrypt_in_place(&mut out[body_start..], &Self::aead_aad(aad));
+        let tag = aead_seal(
+            variant,
+            &self.k_enc,
+            &siv,
+            &mut out[body_start..],
+            &Self::aead_aad(aad),
+        );
         out.extend_from_slice(&tag);
         Ok(out)
     }
@@ -103,7 +183,31 @@ impl PmarineKey {
         self.seal(pt, aad, Some(crate::util::random_array::<NONCE_BYTES>()))
     }
 
+    pub fn seal_random_with_variant(
+        &self,
+        pt: &[u8],
+        aad: &[u8],
+        variant: AegisVariant,
+    ) -> Result<Vec<u8>> {
+        self.seal_with_variant(
+            pt,
+            aad,
+            Some(crate::util::random_array::<NONCE_BYTES>()),
+            variant,
+        )
+    }
+
     pub fn open(&self, envelope: &[u8], aad: &[u8], deterministic: bool) -> Result<Vec<u8>> {
+        self.open_with_variant(envelope, aad, deterministic, AegisVariant::Aegis256)
+    }
+
+    pub fn open_with_variant(
+        &self,
+        envelope: &[u8],
+        aad: &[u8],
+        deterministic: bool,
+        variant: AegisVariant,
+    ) -> Result<Vec<u8>> {
         let head = if deterministic { 0 } else { NONCE_BYTES };
         let min = head + SIV_BYTES + TAG_BYTES;
         if envelope.len() < min {
@@ -121,10 +225,14 @@ impl PmarineKey {
         tag.copy_from_slice(&envelope[tag_start..]);
 
         let mut pt = ct.to_vec();
-        if Aegis256::<TAG_BYTES>::new(&self.k_enc, &siv)
-            .decrypt_in_place(&mut pt, &tag, &Self::aead_aad(aad))
-            .is_err()
-        {
+        if !aead_open(
+            variant,
+            &self.k_enc,
+            &siv,
+            &mut pt,
+            &tag,
+            &Self::aead_aad(aad),
+        ) {
             pt.zeroize();
             return Err(Error::Auth);
         }
@@ -147,7 +255,11 @@ struct CounterWindow {
 
 impl CounterWindow {
     fn new(capacity: usize) -> Self {
-        Self { capacity, seen: HashSet::new(), order: VecDeque::new() }
+        Self {
+            capacity,
+            seen: HashSet::new(),
+            order: VecDeque::new(),
+        }
     }
 
     fn accept(&mut self, counter: u64) -> Result<()> {
@@ -173,6 +285,7 @@ impl CounterWindow {
 /// channel with a different geometry do not authenticate.
 pub struct PmarineChannel {
     cell_size: usize,
+    variant: AegisVariant,
     payload_capacity: usize,
     send_key: PmarineKey,
     recv_key: PmarineKey,
@@ -192,6 +305,26 @@ impl PmarineChannel {
         cell_size: usize,
         max_message_bytes: usize,
     ) -> Result<Self> {
+        Self::new_with_variant(
+            send_key,
+            recv_key,
+            cell_size,
+            max_message_bytes,
+            AegisVariant::Aegis256,
+        )
+    }
+
+    /// Construct a channel with an explicit AEGIS-256 lane variant.
+    ///
+    /// Both peers must select the same variant; a mismatch fails
+    /// authentication. Intended for benchmarks and future profiles.
+    pub fn new_with_variant(
+        send_key: [u8; 32],
+        recv_key: [u8; 32],
+        cell_size: usize,
+        max_message_bytes: usize,
+        variant: AegisVariant,
+    ) -> Result<Self> {
         if cell_size < CELL_HEADER_BYTES + 1 || cell_size > MAX_CELL_SIZE {
             return Err(Error::Range);
         }
@@ -203,6 +336,7 @@ impl PmarineChannel {
         aead_aad.extend_from_slice(&aad);
         Ok(Self {
             cell_size,
+            variant,
             payload_capacity: cell_size - CELL_HEADER_BYTES,
             send_key: PmarineKey::new(&send_key)?,
             recv_key: PmarineKey::new(&recv_key)?,
@@ -235,8 +369,13 @@ impl PmarineChannel {
         out[siv_at..body_at].copy_from_slice(&siv);
         let tag = {
             let body = &mut out[body_at..body_end];
-            Aegis256::<TAG_BYTES>::new(&self.send_key.k_enc, &siv)
-                .encrypt_in_place(body, &self.aead_aad)
+            aead_seal(
+                self.variant,
+                &self.send_key.k_enc,
+                &siv,
+                body,
+                &self.aead_aad,
+            )
         };
         out[body_end..body_end + TAG_BYTES].copy_from_slice(&tag);
         self.send_counter = self.send_counter.checked_add(1).ok_or(Error::Range)?;
@@ -300,14 +439,20 @@ impl PmarineChannel {
         let mut tag = [0u8; TAG_BYTES];
         tag.copy_from_slice(&wire[body_end..]);
 
-        if Aegis256::<TAG_BYTES>::new(&self.recv_key.k_enc, &siv)
-            .decrypt_in_place(&mut wire[body_at..body_end], &tag, &self.aead_aad)
-            .is_err()
-        {
+        if !aead_open(
+            self.variant,
+            &self.recv_key.k_enc,
+            &siv,
+            &mut wire[body_at..body_end],
+            &tag,
+            &self.aead_aad,
+        ) {
             wire.fill(0);
             return Err(Error::Auth);
         }
-        let expected = self.recv_key.siv(&nonce, &self.aad, &wire[body_at..body_end]);
+        let expected = self
+            .recv_key
+            .siv(&nonce, &self.aad, &wire[body_at..body_end]);
         if !ct_eq(&siv, &expected) {
             wire.fill(0);
             return Err(Error::Auth);
@@ -319,7 +464,10 @@ impl PmarineChannel {
             return Ok(ReceivedRef::Padding);
         }
         if view.frag_count == 1 {
-            return Ok(ReceivedRef::Complete { msg_id: view.msg_id, data: view.payload });
+            return Ok(ReceivedRef::Complete {
+                msg_id: view.msg_id,
+                data: view.payload,
+            });
         }
         let cell = Cell {
             kind: view.kind,
@@ -330,7 +478,10 @@ impl PmarineChannel {
             payload: view.payload.to_vec(),
         };
         match self.assembler.push(&cell)? {
-            None => Ok(ReceivedRef::Fragment { kind: view.kind, msg_id: view.msg_id }),
+            None => Ok(ReceivedRef::Fragment {
+                kind: view.kind,
+                msg_id: view.msg_id,
+            }),
             Some((msg_id, data)) => Ok(ReceivedRef::Assembled { msg_id, data }),
         }
     }
@@ -340,9 +491,10 @@ impl PmarineChannel {
         match self.receive_ref(wire)? {
             ReceivedRef::Padding => Ok(Received::Padding),
             ReceivedRef::Fragment { kind, msg_id } => Ok(Received::Fragment { kind, msg_id }),
-            ReceivedRef::Complete { msg_id, data } => {
-                Ok(Received::Complete { msg_id, data: data.to_vec() })
-            }
+            ReceivedRef::Complete { msg_id, data } => Ok(Received::Complete {
+                msg_id,
+                data: data.to_vec(),
+            }),
             ReceivedRef::Assembled { msg_id, data } => Ok(Received::Complete { msg_id, data }),
         }
     }
