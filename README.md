@@ -1,236 +1,638 @@
-# PRAETOR/1
+<p align="center">
+  <img src="docs/praetor-command-hero.png" alt="PRAETOR Command 1.0.0 running a live PMARINE-preset session over the PSEAL transport" width="100%" />
+</p>
 
-**A post-quantum authenticated transport and enforcement protocol, built for a
-world where the adversary is automated, post-quantum, and already recording.**
+<h1 align="center">PRAETOR / 1</h1>
 
-PRAETOR/1 introduces **PSEAL/1**, a new SIV + independent-commitment AEAD
-construction, and wraps it in fixed-cell transport, hybrid post-quantum key
-establishment, forward secrecy, and a capability layer designed to survive a
-rogue AI agent or a coordinated botnet. PSEAL is new at the construction level;
-it composes standard, analysed primitives rather than inventing a block cipher
-or permutation. The experimental **PMARINE** profile is a PSEAL/2 variant built
-on AEGIS-256; it is a profile, not a new primitive. The Rust crate includes a
-fixed-cell `PmarineChannel`; the JavaScript reference and desktop client still
-negotiate PSEAL.
+<p align="center">
+  <strong>Post-quantum authenticated transport and enforcement, with a real Windows control plane.</strong><br />
+  <sub>Fixed-cell PRAETOR/1 · X25519 + ML-KEM-768 · PSEAL/1 · PMARINE (experimental) · local-first MCP</sub>
+</p>
 
-> **Status: reference implementation, not externally audited.**
-> "Military-grade" is a procurement claim, not a security property. See
-> [`docs/SECURITY.md`](praetor/docs/SECURITY.md) for exactly what is and is not proven,
-> and the certification path (FIPS 140-3, CNSA 2.0) required before classified
-> use. Do not protect life-critical data with this yet.
+<p align="center">
+  <a href="https://github.com/nobody71004/praetor-protocol/releases/tag/v1.0.0"><strong>DOWNLOAD PRAETOR COMMAND 1.0.0</strong></a>
+  &nbsp;·&nbsp;
+  <a href="desktop/README.md">DESKTOP GUIDE</a>
+  &nbsp;·&nbsp;
+  <a href="praetor/docs/DESIGN.md">PROTOCOL SPEC</a>
+  &nbsp;·&nbsp;
+  <a href="praetor/docs/BENCHMARKS.md">BENCHMARKS</a>
+</p>
+
+<p align="center">
+  <code>WINDOWS x64</code>
+  <code>NODE 20+</code>
+  <code>RUST 1.75+</code>
+  <code>PRAETOR/1</code>
+  <code>MIT</code>
+</p>
+
+> [!WARNING]
+> **Reference implementation. Not externally audited.**
+> PRAETOR is a research-grade protocol and desktop control plane, not a certified security product. Do not protect life-critical data with it yet. PMARINE is experimental and currently Rust-only. The Windows EXE is unsigned. Read [Security posture](#security-posture) before deploying anything.
 
 ---
 
-## Why another protocol?
+## What this repository is
 
-| Failure mode | What usually happens | What PRAETOR does |
+PRAETOR is two things that share one protocol:
+
+| Surface | What it does | Where it lives |
 |---|---|---|
-| Nonce reuse | GCM/ChaCha20-Poly1305 catastrophically leak the keystream | **SIV construction**: the AEAD nonce is derived from the plaintext, so nonce reuse leaks only equality |
-| Key confusion / partition oracles | A ciphertext verifies under two keys | **Key-committing tag** over an independent commitment key |
-| Harvest-now-decrypt-later | Classical ECDH only | **Hybrid X25519 + ML-KEM-768**; secure if *either* survives |
-| Traffic analysis | Variable record sizes fingerprint the application | **Fixed-size cells**, no cleartext magic/version/length, random padding, optional constant-rate cover |
-| Exact-length leakage | Ciphertext length equals plaintext length | **Padmé** padding: O(log log M) leakage, ≤12% overhead |
-| Rogue agent / stolen capability | Bearer key decrypts everything forever | **Purpose-bound capabilities**, quotas, canaries, lockouts, audit chain, Shamir custody |
-| Mass handshake floods | Server burns CPU per request | **Proof-of-work admission** that escalates under load |
-| Silent history rewriting | Mutable logs | **Hash-chained audit log** verifiable after the fact |
+| **PRAETOR Command** | Windows desktop control plane: profile switching, real TCP egress, Windows system-proxy management, session telemetry, local MCP tools, and an agent fabric. | [`desktop/`](desktop/README.md) |
+| **PRAETOR/1** | Fixed-cell authenticated transport with a hybrid post-quantum handshake, SIV-based record protection, capability enforcement, and cross-language test vectors. | [`praetor/`](praetor/README.md) |
+| **PRAETOR Rust** | Byte-compatible Rust implementation with zero-copy channels, FAST/BOLT profiles, and the experimental PMARINE fixed-cell channel. | [`praetor-rs/`](praetor-rs/README.md) |
+| **PRAETOR egress** | Self-contained Node exit that terminates a PRAETOR session and forwards multiplexed TCP streams. | [`desktop/server/`](desktop/server/README.md) |
 
-PSEAL/1 is a new **AEAD construction**, not a new block cipher or permutation.
-That distinction matters: inventing an unanalysed cipher is how systems die
-(CWE-1240). PSEAL's security argument rests on SIV (Rogaway–Shrimpton),
-encrypt-then-MAC, and an independent commitment key — all standard, named
-components. The construction itself is new and has not had years of public
-cryptanalysis. Do not treat novelty as a proof of strength.
+The desktop app does **not** speak WireGuard. It does not create a TUN device, change IP forwarding, or install a kernel driver. It opens a pinned PRAETOR/1 TCP session, exposes a local SOCKS5 listener, and points the Windows system proxy at it while connected.
 
-## What is actually new
+---
 
-| Layer | Status |
+## Choose your path
+
+| You want to… | Start here |
 |---|---|
-| **PSEAL/1** | New AEAD construction: SIV prefix + ChaCha20-Poly1305 + independent commitment tag |
-| **PRAETOR/PMARINE** | Experimental PSEAL/2 envelope plus a Rust fixed-cell channel: SIV + AEGIS-256, not a new primitive |
-| **PRAETOR/WIRE** | Fixed-cell framing with trial decryption over a bounded epoch window |
-| **PRAETOR-HS/1** | Hybrid X25519 + ML-KEM-768 handshake with two-sided confirmation |
-| **PRAETOR/GUARD** | Capability, quota, audit, custody and admission enforcement |
+| **Use the app on Windows** | [Download the portable EXE](#1-use-the-windows-app) |
+| **Read or audit the protocol** | [`praetor/docs/DESIGN.md`](praetor/docs/DESIGN.md) and [`THREAT-MODEL.md`](praetor/docs/THREAT-MODEL.md) |
+| **Build and test the JavaScript reference** | [`praetor/README.md`](praetor/README.md) |
+| **Build and test the Rust crate** | [`praetor-rs/README.md`](praetor-rs/README.md) |
+| **Build the desktop app or EXE** | [`desktop/README.md`](desktop/README.md) |
+| **Run your own egress server** | [Deploy your own exit](#4-deploy-your-own-egress) |
+| **Connect an external agent** | [MCP and external agents](#5-connect-an-external-agent) |
 
-PSEAL is the new cryptographic construction in this project. It is not a new
-low-level cipher, and this repository does not claim that it is. PMARINE is a
-profile built from standard primitives (AEGIS-256 and HMAC-SHA-256), not a
-third cipher; it is experimental and unaudited.
+---
 
-## Security is not a single benchmark number
+## The system at a glance
 
-PRAETOR is designed for stronger **specific** properties than WireGuard:
-post-quantum key establishment, nonce-misuse resistance, ciphertext key
-commitment, and fixed-cell metadata hiding. WireGuard is much more widely
-reviewed, has a smaller codebase and a mature kernel data path. Those are real
-security advantages too. The honest comparison is a threat-model table, not a
-claim that one word makes a system invulnerable.
+```mermaid
+flowchart TB
+  UI["PRAETOR Command<br/>Electron + React"] --> MCP["Local MCP runtime<br/>36 tools"]
+  UI --> CLIENT["PRAETOR/1 client<br/>pinned X-Wing handshake"]
+  CLIENT -->|"TCP 9443 · fixed cells"| EXIT["PRAETOR egress<br/>Dallas or self-hosted"]
+  EXIT --> NET["Internet"]
+  UI --> PROXY["SOCKS5 listener<br/>127.0.0.1:17890"]
+  PROXY --> CLIENT
+```
 
-## Quickstart (JavaScript reference)
+### The data path, in order
+
+1. The renderer selects a profile and calls the local Electron main process.
+2. The main process opens a TCP connection to the profile's `endpoint`.
+3. Client and server complete **PRAETOR-HS/1**: ephemeral X25519 + ML-KEM-768, transcript binding, and two-sided confirmation.
+4. Application bytes are carried in fixed-size **PRAETOR/WIRE** cells with random padding and no cleartext length magic.
+5. Each cell is protected by **PSEAL/1**: an SIV prefix, ChaCha20-Poly1305 ciphertext, and an independent commitment tag.
+6. The local SOCKS5 listener multiplexes browser/app connections over the session as `CONNECT` / `DATA` / `CLOSE` frames.
+7. While connected, Windows WinINET is pointed at `socks=127.0.0.1:<port>` with a `<local>` bypass. Disconnecting, switching profiles, or quitting restores the previous proxy values.
+
+> **Transport boundary:** this is a TCP proxy, not a TUN/IP tunnel. Browsers and applications that honor the Windows system proxy use it. Apps with their own proxy settings, raw sockets, or their own network stack bypass it.
+
+---
+
+## The four crypto profiles
+
+The desktop app ships with four seeded profiles. All four currently connect through the **PSEAL** transport because the JavaScript egress client implements PSEAL; the app explicitly reports the negotiated suite rather than pretending otherwise.
+
+| Profile | Desktop transport | Rust channel | Status | Use it for |
+|---|---|---|---|---|
+| **PSEAL** | PSEAL/1 | PSEAL/1 | Default | Strongest general-purpose profile; SIV + independent commitment |
+| **FAST** | PSEAL fallback | AES-256-GCM | Opt-in | Throughput-sensitive Rust workloads |
+| **BOLT** | PSEAL fallback | AEGIS-128L | Opt-in | Lowest per-cell cost in the Rust crate |
+| **PMARINE** | PSEAL fallback | AEGIS-256 fixed-cell channel | Experimental | Testing the PSEAL/2 envelope and Rust `PmarineChannel` |
+
+The profile names are **routing presets** in the desktop app today. The Rust crate contains real FAST, BOLT, and PMARINE channels; they are not negotiated by the Electron client yet. The PMARINE profile is intentionally labeled experimental, and the UI shows `PSEAL` as the actual suite when it connects.
+
+### What PSEAL gives you
+
+- **80-byte overhead** in probabilistic mode: 16-byte nonce, 16-byte SIV prefix, 16-byte Poly1305 tag, 32-byte commitment tag.
+- **64-byte deterministic mode** when an explicit nonce is supplied.
+- **Nonce-misuse resistance:** the SIV is derived from the plaintext, so nonce reuse leaks equality rather than the keystream.
+- **Key commitment:** an independent HMAC commitment prevents a ciphertext from verifying under two keys.
+- **Fixed-cell framing:** no cleartext magic, version, suite ID, message length, or record count.
+
+PMARINE keeps the same envelope shape but replaces the inner AEAD and separate commitment with AEGIS-256 and a 32-byte SIV used as the AEGIS nonce. It is Rust-only, experimental, and not the default. See [`praetor/docs/PMARINE.md`](praetor/docs/PMARINE.md).
+
+---
+
+## What ships in the box
+
+| Capability | Status | Details |
+|---|---|---|
+| PRAETOR/1 handshake | Stable reference | X25519 + ML-KEM-768, ephemeral client keys, pinned server X-Wing key |
+| PSEAL/1 | Stable reference | SIV + ChaCha20-Poly1305 + independent commitment tag |
+| Fixed-cell wire transport | Stable reference | 1024 B cells → 1104 B on the wire; 4-epoch trial decryption window |
+| Windows system proxy | Stable | Stable loopback port `17890`, `<local>` bypass, persistent backup and crash recovery |
+| SOCKS5 / SOCKS4 egress | Stable | TCP CONNECT multiplexing; DNS resolved by the exit |
+| PMARINE | Experimental | Rust `PmarineChannel`, replay window, cell-geometry AAD, zero-copy paths |
+| Desktop MCP server | Stable | 36 local tools; guarded by roots, policy, and an audit chain |
+| Optional model agent | Stable | Any OpenAI-compatible chat-completions endpoint; key held in memory only |
+| Cross-language vectors | Stable | Shared PSEAL, KEM, Padmé, and Shamir vectors |
+| Signed installer | Not available | The portable EXE is unsigned; SmartScreen may warn |
+
+---
+
+## 1. Use the Windows app
+
+### Requirements
+
+- Windows 10 or 11, x64.
+- Outbound TCP to the egress endpoint (default `104.251.218.227:9443`).
+- No Node installation is required to run the packaged app. Node.js 20+ is only needed for external MCP clients.
+
+### Step 1 — Download the portable EXE
+
+Open the [v1.0.0 release](https://github.com/nobody71004/praetor-protocol/releases/tag/v1.0.0) and download:
+
+```text
+PRAETOR-Command-1.0.0.exe
+```
+
+Or from PowerShell:
+
+```powershell
+Invoke-WebRequest `
+  -Uri "https://github.com/nobody71004/praetor-protocol/releases/download/v1.0.0/PRAETOR-Command-1.0.0.exe" `
+  -OutFile "PRAETOR-Command-1.0.0.exe"
+```
+
+### Step 2 — Verify the download
+
+```powershell
+Get-FileHash .\PRAETOR-Command-1.0.0.exe -Algorithm SHA256
+```
+
+Expected SHA-256:
+
+```text
+330efb4e3d000e8bcca5766b1ac7ed4eba86cf03e2730e52f4a5841563d79e6c
+```
+
+Expected size: `80,679,566` bytes.
+
+The EXE is unsigned. If SmartScreen appears, choose **More info → Run anyway** only after verifying the hash above.
+
+### Step 3 — Launch and connect
+
+1. Run `PRAETOR-Command-1.0.0.exe`. It is portable; there is no installer.
+2. On first launch, the app seeds four profiles: **Nexus PSEAL**, **Nexus FAST**, **Nexus BOLT**, and **Nexus PMARINE**.
+3. Select **Nexus PSEAL** on the Overview page.
+4. Press **Connect**.
+5. Wait for the session card to show **ONLINE**. The dashboard reports the handshake time, suite, cell size, proxy port, and live traffic.
+6. Verify that browser traffic is exiting through the egress:
+
+```powershell
+curl.exe --socks5-hostname 127.0.0.1:17890 https://ipinfo.io/json
+```
+
+The default Dallas exit should report Dallas, Texas and:
+
+```text
+104.251.218.227
+```
+
+If the app chose a different local port because `17890` was occupied, use the port shown in the session card.
+
+### Step 4 — Disconnect cleanly
+
+Press **Disconnect** before closing the app. The app restores the previous WinINET proxy settings. If the process is killed while connected, the next launch restores direct access before opening the window.
+
+State and logs live under:
+
+```text
+%APPDATA%\PRAETOR Command\
+```
+
+The Windows proxy registry key is:
+
+```text
+HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings
+```
+
+### What the desktop app actually does
+
+- Client X-Wing keypairs are ephemeral per handshake and are never written to a profile.
+- The server public key is pinned for every profile. It must be exactly 1,216 decoded bytes.
+- The local SOCKS listener uses port `17890`; it falls back to an ephemeral port only if that port is already occupied.
+- The app writes a persistent proxy backup and managed-proxy marker before changing WinINET.
+- The proxy bypass is `<local>`, so loopback and local-network destinations do not go through the egress.
+- Traffic counters and handshake time come from the real transport, not from synthetic UI metrics.
+
+> [!NOTE]
+> The desktop app reports `PSEAL` for all four seeded profiles today. Selecting Nexus FAST, BOLT, or PMARINE changes the requested preset and Activity label, not the negotiated channel. This is deliberate until those channels are wired into the JavaScript client.
+
+---
+
+## 2. Build and test from source
+
+### Toolchain matrix
+
+| Tool | Version | Needed for |
+|---|---|---|
+| Node.js | 20+ (Node 24 tested) | JavaScript reference, desktop app, MCP |
+| npm | Bundled with Node | Dependency install and scripts |
+| Rust | 1.75+ | Rust crate and CLI |
+| C compiler | MSVC C++ Build Tools or `clang-cl` | AEGIS native build |
+| Git Bash / PowerShell | Current | Commands on Windows |
+| Linux + systemd + nftables | Node 22 on the host | Self-hosted egress only |
+
+### Step 1 — Clone
+
+```bash
+git clone https://github.com/nobody71004/praetor-protocol.git
+cd praetor-protocol
+```
+
+The repository is private; use an account with access.
+
+### Step 2 — JavaScript reference
 
 ```bash
 cd praetor
-npm install
-npm test                 # 59 tests incl. tamper, replay, downgrade, policy
-npm run test:browser     # browser bundle parity (handshake, cells, PSEAL, KEM)
-npm run build:browser    # browser/dist + standalone browser/demo.html
-node bin/praetor.js selftest
-node bin/praetor.js bench
-
-node bin/praetor.js keygen --out demo.key
-printf 'hello praetor' | node bin/praetor.js seal --key demo.key --out msg.pseal --json
-node bin/praetor.js open --key demo.key --in msg.pseal
-
-node bin/praetor.js encrypt --key demo.key --in big.bin --out big.praetor --pad 1048576
-node bin/praetor.js decrypt --key demo.key --in big.praetor --out big.out
+npm ci
+npm test
+npm run test:browser
 ```
 
-Rust implementation:
+Expected:
+
+```text
+59 tests passed
+browser bundle: PASS
+```
+
+The JS package contains the reference AEAD, handshake, fixed-cell channel, container format, policy layer, CLI, browser bundle, and shared vectors.
+
+Useful commands:
 
 ```bash
-cd praetor-rs
-./cargo.sh test           # 41 tests, byte-compatible with the JS vectors
-./cargo.sh run --release -- selftest
-./cargo.sh run --release -- bench
+node bin/praetor.js selftest
+node bin/praetor.js bench
+node bin/praetor.js keygen --out demo.key
 ```
 
-Desktop control plane:
+### Step 3 — Rust crate
+
+```bash
+cd ../praetor-rs
+./cargo.sh test --release
+./cargo.sh run --release -- selftest
+```
+
+Expected: **41 tests passed**, including 17 PMARINE tests and the AEGIS-256 RFC 10032 vector.
+
+On Windows, `aegis` needs a working C compiler. If you have Visual Studio's C++ workload but not `clang-cl`, force MSVC:
+
+```bash
+# Git Bash, opened from a Visual Studio Developer Command Prompt
+CC=cl ./cargo.sh test --release
+```
+
+PowerShell equivalent:
+
+```powershell
+$env:CC = "cl"
+bash ./cargo.sh test --release
+```
+
+If `cargo.sh` finds the project-local `.toolchain`, it uses that; otherwise it uses the system `cargo`.
+
+### Step 4 — Desktop development
+
+```bash
+cd ../desktop
+npm ci
+npm run dev
+```
+
+`npm run dev` builds the MCP bundles, starts Vite on `127.0.0.1:5173`, and launches Electron.
+
+For production-renderer mode without packaging:
+
+```bash
+npm run build
+npm start
+```
+
+### Step 5 — Build the portable EXE
 
 ```bash
 cd desktop
-npm install
-npm start                 # Electron + Vite development app
-npm run dist              # portable EXE in desktop/release/
+npm ci
+npm run dist
 ```
 
-The desktop app seeds **Nexus PSEAL**, **Nexus FAST**, **Nexus BOLT** and
-**Nexus PMARINE** profiles. All four currently connect through the PSEAL
-transport to the Dallas egress; FAST, BOLT and PMARINE are routing presets until
-their separate channels are negotiated by the client. See
-[`desktop/README.md`](desktop/README.md) for the proxy lifecycle and server
-deployment notes.
+Output:
 
-## Architecture
-
-```
- application message
-        │
-        ▼
-┌───────────────────────┐   fragmentation, ids, random padding
-│  PRAETOR/WIRE cells     │   fixed 1024 B plaintext → 1104 B on the wire
-│  (no magic, no len)   │   trial-decryption over a 4-epoch window
-└──────────┬────────────┘
-           │ per-epoch key (ratcheted every 1024 records)
-           ▼
-┌───────────────────────┐   prefix = HMAC(pt, nonce) → SIV
-│  PSEAL/1 envelope     │   ct = ChaCha20-Poly1305(prefix)
-│  (misuse-resistant)   │   tag = HMAC(k_com, ct) → commitment
-└──────────┬────────────┘
-           │ keys from handshake ratchet
-           ▼
-┌───────────────────────┐   X25519 + ML-KEM-768, two-sided ephemeral
-│  PRAETOR-HS/1 handshake │   confirmation both ways, transcript-bound
-└──────────┬────────────┘
-           │
-           ▼
-┌───────────────────────┐   purpose binding, quotas, canaries, lockouts,
-│  PRAETOR/GUARD          │   circuit breaker, audit chain, Shamir 3-of-5,
-│  (untrusted callers)  │   proof-of-work admission
-└───────────────────────┘
+```text
+desktop/release/PRAETOR-Command-1.0.0.exe
 ```
 
-## Transports and clients
+To regenerate the application icon after changing the mark:
 
-* **TCP streaming adapter** (`@praetor/protocol/transport`): framed hybrid
-  handshake, then fixed-size authenticated cells with backpressure. The server
-  key must be pinned; both sides must configure the same `cellSize`. See
-  [`docs/TRANSPORT.md`](praetor/docs/TRANSPORT.md).
-* **Browser client** (`browser/`): an esbuild bundle of the same core code with
-  WebCrypto randomness and pure-JS Noble primitives. `browser/demo.html` runs a
-  complete handshake and channel self-test in the page; `npm run test:browser`
-  checks bundle parity in Node. See [`docs/BROWSER.md`](praetor/docs/BROWSER.md).
-
-Measured on one Windows x64 machine, single-threaded: the JS reference seals
-1 MiB at 358 MiB/s and completes 86 handshakes/s; the Rust release build's
-PSEAL seals at 499 MiB/s and completes 3,487 handshakes/s. The experimental
-PMARINE envelope seals at 1,174.7 MiB/s (median, 1 MiB). See
-[`docs/BENCHMARKS.md`](praetor/docs/BENCHMARKS.md) for the full tables.
-
-There are three transport profiles, plus one experimental envelope profile.
-**PSEAL** is the default and is **not**
-faster than WireGuard: 0.15× the 1 KiB roundtrip rate and 0.11× the 60 KB
-throughput, the measured cost of two-pass SIV, the commitment tag, 80-byte
-cells and ML-KEM-768. **PRAETOR/FAST** (AES-256-GCM via `ring`) reaches
-**3.31×** and **3.33×**. **PRAETOR/BOLT** (AEGIS-128L) is the fastest:
-**3.98×** the 1 KiB roundtrip rate and **4.47×** the 60 KB throughput, which
-is 1.20× and 1.34× ahead of FAST under the same zero-copy API. The handshake
-is now **0.86×** (up from 0.60×); after moving ML-KEM to libcrux's AVX2
-backend, X25519 DH dominates the remaining cost.
-FAST and BOLT are weaker than PSEAL by design; see
-[`docs/FAST.md`](praetor/docs/FAST.md) and
-[`docs/BOLT.md`](praetor/docs/BOLT.md).
-
-**PRAETOR/PMARINE** is the experimental PSEAL/2 envelope and fixed-cell channel:
-it keeps PSEAL's SIV and 80-byte overhead but replaces the inner AEAD and
-separate commitment tag with AEGIS-256 (RFC 10032), a 32-byte SIV used as the
-AEGIS nonce and re-derived after decryption. It is Rust-only, not the default,
-and not yet negotiated by the JavaScript or desktop transports; it measured
-1.15 GiB/s sealing at 1 MiB versus PSEAL's 499 MiB/s. See
-[`docs/PMARINE.md`](praetor/docs/PMARINE.md).
-
-![PRAETOR/1 vs WireGuard](praetor/docs/benchmarks-praetor-vs-wireguard.svg)
-
-Against Cloudflare `boringtun` 0.7.1 (userspace WireGuard, same CPU, single
-thread), medians of three runs on the same machine: **3,487 handshakes/s** vs
-**4,042**; PSEAL **147k 1 KiB roundtrips/s** and **143.1 MiB/s** at 60 KB;
-FAST **3.22M** and **4,346.0 MiB/s**; BOLT **3.88M** and **5,830.4 MiB/s**,
-versus WireGuard's **973k** and **1,303.8 MiB/s**. All three PRAETOR transport
-rows use the same zero-copy buffer API as boringtun, so the gap is protocol
-overhead and AEAD choice, not a harness difference. This is protocol CPU cost,
-not a kernel-tunnel wall-clock test. Full methodology:
-[`docs/BENCHMARKS.md`](praetor/docs/BENCHMARKS.md).
-
-Full byte-level specification: [`docs/DESIGN.md`](praetor/docs/DESIGN.md).
-Adversary analysis incl. rogue agents and mass coordination:
-[`docs/THREAT-MODEL.md`](praetor/docs/THREAT-MODEL.md).
-Literature and rationale: [`docs/RESEARCH.md`](praetor/docs/RESEARCH.md).
-Experimental PMARINE profile: [`docs/PMARINE.md`](praetor/docs/PMARINE.md).
-Measured performance: [`docs/BENCHMARKS.md`](praetor/docs/BENCHMARKS.md).
-Adversarial review, findings and fixes:
-[`docs/SECURITY-REVIEW.md`](praetor/docs/SECURITY-REVIEW.md).
-
-## Byte-level guarantees
-
-* **PSEAL overhead:** 80 bytes (16 nonce + 16 SIV prefix + 16 Poly1305 tag +
-  32 commitment tag). Deterministic mode: 64 bytes.
-* **PMARINE overhead:** 80 bytes probabilistic, 64 deterministic, with a
-  32-byte SIV and 32-byte AEGIS-256 tag. Experimental and Rust-only.
-* **Cell overhead:** 80 bytes; 1024-byte cell → 1104 bytes on the wire.
-* **No cleartext structure:** no magic, version, suite id, message length or
-  record count is visible. A wrong key sees random bytes.
-* **Fail closed:** tag → decrypt → prefix re-derivation; no unauthenticated
-  plaintext is ever released.
-* **Replay/reorder/truncation/splice:** detected by message ids, fragment
-  indices, per-chunk AAD and a final-chunk flag.
-
-## Non-goals
-
-* Not a replacement for TLS on the public web; no PKI, OCSP, or ALPN.
-* Not formally verified; the security argument is by reduction to named
-  primitives, not machine-checked.
-* Not FIPS 140-3 validated, not CNSA 2.0 compliant (that requires ML-KEM-1024,
-  AES-256/SHA-384 and a validated module boundary).
-* The JS implementation is not constant-time (JIT). Use the Rust build where
-  local side channels are in scope.
-
-## Layout
-
-```
-praetor/            JavaScript reference implementation, CLI, tests, vectors
-praetor-rs/         Rust implementation (byte-compatible), CLI, tests
-praetor/docs/       design, threat model, research, security, AI integration
-praetor/vectors/    shared cross-language test vectors
+```bash
+npm run icon
+npm run dist
 ```
 
-## Licence
+If electron-builder cannot reach GitHub for its Windows toolsets, use the mirror documented in [`desktop/README.md`](desktop/README.md):
 
-MIT.
+```bash
+ELECTRON_BUILDER_BINARIES_MIRROR="https://npmmirror.com/mirrors/electron-builder-binaries/" \
+  npx electron-builder --win portable
+```
+
+The build writes `release/` and `node_modules/` but does not commit either. The EXE is unsigned; configure a code-signing certificate before distributing it to untrusted users.
+
+### Step 6 — Verify the package
+
+```bash
+cd desktop
+node mcp/agent-pipeline.mjs
+./node_modules/.bin/asar list release/win-unpacked/resources/app.asar | head
+```
+
+The packaged `app.asar` should include `dist/`, `electron/`, and `package.json`; the portable EXE is built from that unpacked application.
+
+---
+
+## 3. Profile reference
+
+Each profile stores only client-side configuration:
+
+| Field | Meaning |
+|---|---|
+| `protocol` | Always `PRAETOR/1` |
+| `suite` | `PSEAL`, `FAST`, `BOLT`, or `PMARINE` |
+| `endpoint` | TCP `host:port`; default `104.251.218.227:9443` |
+| `cellSize` | Fixed framing size; both ends must match; default `1024` |
+| `serverPublicKey` | Pinned 1,216-byte X-Wing public key (base64) |
+| `autoConnect` | Connect when the app starts, if global auto-connect is enabled |
+
+The seeded profiles point at the Dallas egress and pin its public key. To use your own exit, replace the endpoint and pinned key in the profile editor, or change the defaults in:
+
+- [`desktop/src/lib/praetor.js`](desktop/src/lib/praetor.js)
+- [`desktop/electron/store.cjs`](desktop/electron/store.cjs)
+
+Changing the server key invalidates every existing profile that pins the old key. Distribute the new public key out of band; never ship the private key.
+
+---
+
+## 4. Deploy your own egress
+
+This section is for a Linux host. The egress is a userspace TCP forwarder: it does not create a TUN device and does not need IP forwarding.
+
+### Host requirements
+
+- Linux with systemd and nftables.
+- Node.js 22 at `/opt/praetor-egress/node/bin/node` (or edit the service unit).
+- Root access for the service and ingress rule.
+- Inbound TCP `9443` allowed.
+
+### Step 1 — Generate a server keypair
+
+Run from the `praetor` source checkout:
+
+```bash
+cd praetor
+node --input-type=module <<'NODE'
+import { writeFileSync } from 'node:fs';
+import { generateServerKeypair } from './src/index.js';
+
+const { publicKey, secretKey } = generateServerKeypair();
+writeFileSync('server.key', `${secretKey.toString('base64')}\n`, { mode: 0o600 });
+writeFileSync('server.pub', `${publicKey.toString('base64')}\n`);
+NODE
+```
+
+`server.key` is the 2,432-byte private key. **Never commit it, paste it into chat, or put it in the desktop app.** The repository ships only `desktop/server/keys/praetor-server.pub`.
+
+Put the private key where the deploy script expects it:
+
+```bash
+cp server.key ../desktop/server/keys/praetor-server.key
+cp server.pub ../desktop/server/keys/praetor-server.pub
+```
+
+Update the pinned public key in the desktop profiles, or update the defaults and rebuild the app.
+
+### Step 2 — Build the server bundle
+
+```bash
+cd praetor
+npm ci
+node_modules/.bin/esbuild bin/praetor-egress.js \
+  --bundle --platform=node --format=esm --target=node20 \
+  --outfile=dist/praetor-egress.mjs
+```
+
+Expected output:
+
+```text
+dist/praetor-egress.mjs
+```
+
+### Step 3 — Deploy the service
+
+From the repository root:
+
+```bash
+PRAETOR_EGRESS_SSH=root@your.host \
+PRAETOR_EGRESS_SSH_KEY="$HOME/.ssh/id_ed25519" \
+bash desktop/server/deploy.sh
+```
+
+The script:
+
+1. Creates `/opt/praetor-egress`.
+2. Copies the bundle and private key.
+3. Installs `praetor-egress.service` and `praetor-ingress.service`.
+4. Installs `praetor-ingress-rule.sh`.
+5. Enables both units and prints the service status.
+
+Defaults are `root@104.251.218.227` and `tmp/relay_ed25519`. Override both for your host.
+
+The ingress helper adds:
+
+```text
+tcp dport 9443 accept comment "praetor:egress"
+```
+
+to the existing `inet nexus_edge` table. If you use a different firewall layout, adapt [`desktop/server/praetor-ingress-rule.sh`](desktop/server/praetor-ingress-rule.sh) or open TCP `9443` yourself.
+
+### Step 4 — Verify the server
+
+```bash
+systemctl status praetor-egress
+ss -lntp | grep 9443
+nft list chain inet nexus_edge input | grep praetor
+```
+
+### Step 5 — Verify the exit from a client
+
+From the repository root:
+
+```bash
+node praetor/bin/praetor-proxy.js \
+  --host 104.251.218.227 --port 9443 \
+  --server-key desktop/server/keys/praetor-server.pub \
+  --listen 1080
+```
+
+In another terminal:
+
+```bash
+curl --socks5-hostname 127.0.0.1:1080 https://ipinfo.io/json
+```
+
+The response must show `"ip": "104.251.218.227"` for the default Dallas exit, or your own host's public address for a custom exit.
+
+### Egress security notes
+
+- The client authenticates the **server** with the pinned X-Wing key.
+- The server does **not** authenticate individual clients. Anyone who has the public key and can reach TCP `9443` can use the exit.
+- Keep the public key distribution private, add a network allowlist, or add a pre-shared admission check before exposing an exit to untrusted users.
+- The egress supports **PSEAL only** today. FAST, BOLT, and PMARINE are Rust-side channels and are not negotiated by this server.
+- Run the Node process as an unprivileged user once the nftables rule exists; the service unit uses root because the reference host layout does.
+
+---
+
+## 5. Connect an external agent
+
+The desktop app includes a local MCP runtime with 36 tools: system information, screen capture, mouse/keyboard input, application control, filesystem access, shell, developer workflows, clipboard, notifications, processes, and policy inspection.
+
+### In the app
+
+1. Open **Agent Fabric**.
+2. Run the built-in diagnostic.
+3. Copy the generated MCP config.
+4. Keep **Full control** disabled unless you specifically need destructive or system-wide actions.
+
+The generated config is written to:
+
+```text
+%APPDATA%\PRAETOR Command\mcp-config.json
+```
+
+The bundled MCP runtime lives in:
+
+```text
+%APPDATA%\PRAETOR Command\mcp\
+```
+
+### External client example
+
+Install Node.js 20+ so the config remains valid after the app closes, then point your MCP client at the generated server:
+
+```json
+{
+  "mcpServers": {
+    "praetor-computer-use": {
+      "command": "C:\\Program Files\\nodejs\\node.exe",
+      "args": ["C:\\Users\\<you>\\AppData\\Roaming\\PRAETOR Command\\mcp\\server.mjs"],
+      "env": {
+        "PRAETOR_MCP_ROOTS": "C:\\Users\\<you>",
+        "PRAETOR_MCP_AUDIT": "C:\\Users\\<you>\\AppData\\Roaming\\PRAETOR Command\\audit.jsonl",
+        "PRAETOR_MCP_ALLOW_WRITES": "1",
+        "PRAETOR_MCP_ALLOW_SHELL": "0",
+        "PRAETOR_MCP_ALLOW_FULL": "0"
+      }
+    }
+  }
+}
+```
+
+Run the diagnostic from a terminal:
+
+```bash
+cd desktop
+npm run mcp:test
+```
+
+### MCP safety model
+
+- Filesystem roots are allowlisted; tools cannot escape them.
+- Shell and full-control tools stay disabled unless explicitly enabled in Settings or Agent Fabric.
+- Every tool invocation is appended to `%APPDATA%\PRAETOR Command\audit.jsonl`.
+- Agent API keys are held in memory for the run only and passed to the child through its environment.
+- The renderer has no Node integration; it uses a narrow, context-isolated preload bridge.
+- External links are opened only after an HTTP(S) check.
+
+---
+
+## Verification matrix
+
+Last verified: **2026-11-09**, Windows x64, release build.
+
+| Check | Result |
+|---|---|
+| JavaScript protocol suite | **59 / 59 passed** |
+| Rust protocol suite | **41 / 41 passed** |
+| PMARINE tests | **17 passed**, including RFC 10032 vector |
+| Renderer production build | Passed |
+| Packaged `app.asar` profile seed | Four profiles, schema 4 |
+| Schema-3 → schema-4 migration | PMARINE injected and persisted once |
+| Portable EXE packaged | `PRAETOR-Command-1.0.0.exe`, 80,679,566 bytes |
+| Release asset digest | `sha256:330efb4e3d000e8bcca5766b1ac7ed4eba86cf03e2730e52f4a5841563d79e6c` |
+| Real TCP egress | PSEAL handshake and SOCKS5 traffic verified against the Dallas exit |
+
+The protocol tests cover roundtrips, tamper rejection, replay rejection, padding, key separation, handshake impersonation, KEM implicit rejection, guard policy, audit-chain tampering, Shamir custody, proof-of-work admission, and the PMARINE channel geometry.
+
+---
+
+## Security posture
+
+**PRAETOR is not a drop-in replacement for TLS on the public web.** It has no PKI, OCSP, or ALPN. The reference server key is pinned; distribution is a trust decision you must make.
+
+- **Not externally audited.** The construction is argued by reduction to named primitives, not by a completed public cryptanalysis program.
+- **PMARINE is experimental.** The Rust `PmarineChannel` exists, but the Electron client does not negotiate it.
+- **The JS implementation is not constant-time.** JIT and library behavior are not a hardened side-channel boundary.
+- **No FIPS 140-3 certification, no CNSA 2.0 compliance.** Those require a validated module boundary, different parameter choices, and certification work.
+- **No client authentication on the reference egress.** The public key identifies the server, not the user.
+- **The EXE is unsigned.** Verify the SHA-256 before running it.
+- **The system proxy is not a TUN.** Apps with their own network stack can bypass it.
+- **Do not commit private keys.** The repository contains a public key only; treat `server.key`, `praetor-server.key`, and `tmp/relay_ed25519` as secrets.
+
+Read [`praetor/docs/SECURITY.md`](praetor/docs/SECURITY.md), [`THREAT-MODEL.md`](praetor/docs/THREAT-MODEL.md), and [`SECURITY-REVIEW.md`](praetor/docs/SECURITY-REVIEW.md) before making deployment decisions.
+
+---
+
+## Repository map
+
+```text
+praetor/                  JavaScript reference, CLI, browser bundle, tests, vectors
+praetor-rs/               Rust implementation, zero-copy channels, PMARINE
+praetor/docs/             protocol design, threat model, benchmarks, security review
+desktop/                  Electron + React control plane
+desktop/electron/         main process, preload bridge, local store, PRAETOR client
+desktop/mcp/              policy, 36 tools, stdio server, agent pipeline
+desktop/server/           self-hosted egress bundle, systemd units, ingress helper
+desktop/release/          generated portable EXE (ignored by Git)
+docs/                     README hero and visual assets
+```
+
+### Documentation index
+
+| Document | Read it for |
+|---|---|
+| [`praetor/docs/DESIGN.md`](praetor/docs/DESIGN.md) | Byte-level protocol and wire format |
+| [`praetor/docs/TRANSPORT.md`](praetor/docs/TRANSPORT.md) | TCP framing, backpressure, cell handling |
+| [`praetor/docs/THREAT-MODEL.md`](praetor/docs/THREAT-MODEL.md) | Adversaries, rogue agents, mass coordination |
+| [`praetor/docs/PMARINE.md`](praetor/docs/PMARINE.md) | PSEAL/2 envelope and fixed-cell channel |
+| [`praetor/docs/FAST.md`](praetor/docs/FAST.md) | AES-256-GCM profile |
+| [`praetor/docs/BOLT.md`](praetor/docs/BOLT.md) | AEGIS-128L profile |
+| [`praetor/docs/BENCHMARKS.md`](praetor/docs/BENCHMARKS.md) | Throughput and handshake methodology |
+| [`praetor/docs/SECURITY.md`](praetor/docs/SECURITY.md) | Guarantees, non-goals, certification path |
+| [`praetor/docs/SECURITY-REVIEW.md`](praetor/docs/SECURITY-REVIEW.md) | Findings and fixes |
+| [`desktop/README.md`](desktop/README.md) | Desktop build, proxy lifecycle, MCP details |
+| [`desktop/server/README.md`](desktop/server/README.md) | Egress deployment and server notes |
+
+---
+
+## License
+
+MIT. See the repository license for the exact text.
+
+<br />
+
+<p align="center">
+  <sub>PRAETOR / 1 · control the path, not just the packet · built for the machine-speed adversary</sub>
+</p>

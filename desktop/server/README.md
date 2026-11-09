@@ -96,7 +96,8 @@ The response must show `"ip": "104.251.218.227"` and Dallas, Texas.
   exit. Keep the key distribution private, and add a network allowlist or a
   pre-shared admission check if the host is shared with untrusted users.
 - `PSEAL` is the only suite implemented by this JavaScript transport. The desktop
-  app rejects `FAST` and `BOLT` connects with a clear error.
+  app reports `PSEAL` for the FAST, BOLT and PMARINE presets until those channels
+  are wired into the JavaScript client.
 - The service runs as root only because the existing host layout uses root for
   the Node install and nftables. The Node process itself does not require root
   once the ingress rule exists; a dedicated unprivileged user is a reasonable
