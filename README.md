@@ -129,23 +129,28 @@ cd praetor-rs
 
 Measured on one Windows x64 machine, single-threaded: the JS reference seals
 1 MiB at 358 MiB/s and completes 86 handshakes/s; the Rust release build seals
-at 443 MiB/s and completes 2,177 handshakes/s. See
+at 433 MiB/s and completes 2,257 handshakes/s. See
 [`docs/BENCHMARKS.md`](praetor/docs/BENCHMARKS.md) for the full tables.
 
-PRAETOR is **not faster than WireGuard** on the same CPU. Against userspace
-`boringtun` it reaches about 0.53× the handshake rate, 0.14× the 1 KiB
-roundtrip rate and 0.11× the 60 KB full-path throughput. That is the measured
-cost of SIV, the commitment tag, fixed cells and ML-KEM-768. Claims that a
-protocol with those properties is simultaneously faster than WireGuard would
-need a different benchmark, hardware, or threat model.
+There are two transport profiles. **PSEAL** is the default and is **not**
+faster than WireGuard: 0.13× the 1 KiB roundtrip rate and 0.10× the 60 KB
+throughput, the measured cost of two-pass SIV, the commitment tag, 80-byte
+cells and ML-KEM-768. **PRAETOR/FAST** — opt-in, AES-256-GCM, no SIV or
+commitment — is faster on the transport path: **2.05×** WireGuard's 1 KiB
+roundtrips and **2.79×** its 60 KB throughput on the same CPU. The handshake
+is still **0.59×**, because X25519 + ML-KEM-768 costs more than X25519 alone.
+FAST is weaker than PSEAL by design; see [`docs/FAST.md`](praetor/docs/FAST.md).
 
 ![PRAETOR/1 vs WireGuard](praetor/docs/benchmarks-praetor-vs-wireguard.svg)
 
 Against Cloudflare `boringtun` 0.7.1 (userspace WireGuard, same CPU, single
-thread): PRAETOR completes **2,177 handshakes/s** vs **4,082**, **130k 1 KiB
-roundtrips/s** vs **932k**, and **131.1 MiB/s** at 60 KB vs **1,193.2 MiB/s**.
-This is protocol CPU cost, not a kernel-tunnel wall-clock test; PRAETOR pays for
-SIV, commitment, fixed cells and a post-quantum handshake. Full methodology:
+thread), medians of three runs in one session: **2,257 handshakes/s** vs
+**3,842**; PSEAL **121k 1 KiB roundtrips/s** and **120.9 MiB/s** at 60 KB;
+FAST **1.88M roundtrips/s** and **3,260.8 MiB/s** vs WireGuard's **913.8k**
+and **1,169.3 MiB/s**. FAST links the same `ring` AES-256-GCM backend as
+boringtun, so the transport gap is protocol overhead and AEAD choice, not a
+crypto-library artefact. This is protocol CPU cost, not a kernel-tunnel
+wall-clock test. Full methodology:
 [`docs/BENCHMARKS.md`](praetor/docs/BENCHMARKS.md).
 
 Full byte-level specification: [`docs/DESIGN.md`](praetor/docs/DESIGN.md).

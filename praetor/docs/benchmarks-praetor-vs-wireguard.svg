@@ -1,61 +1,70 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="790" viewBox="0 0 1040 790" role="img" aria-labelledby="title desc" font-family="Segoe UI, Arial, sans-serif">
-  <title id="title">PRAETOR/1 versus WireGuard on the same CPU</title>
-  <desc id="desc">Grouped bar chart of handshakes per second, 1 KiB authenticated roundtrips per second, and 60 KB full-path throughput. WireGuard is boringtun userspace; PRAETOR is the Rust release build.</desc>
-  <rect width="1040" height="790" fill="#0b0f12"/>
-  <text x="56" y="62" fill="#e7f2ea" font-size="30" font-weight="800" letter-spacing="-0.5">PRAETOR/1 vs WireGuard</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="900" viewBox="0 0 1040 900" role="img" aria-labelledby="title desc" font-family="Segoe UI, Arial, sans-serif">
+  <title id="title">PRAETOR/1 profiles versus WireGuard on the same CPU</title>
+  <desc id="desc">Grouped bar chart of handshakes per second, 1 KiB authenticated roundtrips per second, and 60 KB full-path throughput. PSEAL is the strong default; FAST is an opt-in AES-GCM performance profile that is faster than userspace WireGuard on transport but not on handshakes. WireGuard is boringtun userspace.</desc>
+  <rect width="1040" height="900" fill="#0b0f12"/>
+  <text x="56" y="62" fill="#e7f2ea" font-size="30" font-weight="800" letter-spacing="-0.5">PRAETOR/1 profiles vs WireGuard</text>
   <text x="56" y="92" fill="#8fa6a1" font-size="14">Same machine · single thread · Rust release builds · higher is better</text>
   <g font-family="Segoe UI, Arial, sans-serif">
-    <rect x="826" y="46" width="14" height="14" rx="3" fill="#5ce1b0"/>
-    <text x="848" y="58" fill="#e7f2ea" font-size="13">PRAETOR/1 Rust</text>
-    <rect x="826" y="70" width="14" height="14" rx="3" fill="#6aa9ff"/>
-    <text x="848" y="82" fill="#e7f2ea" font-size="13">WireGuard (boringtun)</text>
+    <rect x="718" y="46" width="14" height="14" rx="3" fill="#5ce1b0"/>
+    <text x="740" y="58" fill="#e7f2ea" font-size="13">PSEAL</text>
+    <rect x="810" y="46" width="14" height="14" rx="3" fill="#ffc46b"/>
+    <text x="832" y="58" fill="#e7f2ea" font-size="13">FAST</text>
+    <rect x="900" y="46" width="14" height="14" rx="3" fill="#6aa9ff"/>
+    <text x="922" y="58" fill="#e7f2ea" font-size="13">WireGuard</text>
   </g>
   <line x1="56" y1="116" x2="984" y2="116" stroke="#22323a"/>
   
   <g>
     <text x="56" y="156" fill="#e7f2ea" font-size="19" font-weight="700">Handshakes per second</text>
-    <text x="56" y="178" fill="#8fa6a1" font-size="13">complete Noise / hybrid handshake · ops/s</text>
+    <text x="56" y="178" fill="#8fa6a1" font-size="13">both PRAETOR profiles share the hybrid handshake · ops/s</text>
+    
     <rect x="250" y="198" width="660" height="34" rx="7" fill="#152027" stroke="#22323a"/>
-    <rect x="250" y="198" width="325.877396993703" height="34" rx="7" fill="#5ce1b0"/>
+    <rect x="250" y="198" width="359.07010923883934" height="34" rx="7" fill="#5ce1b0"/>
     <text x="56" y="220" fill="#e7f2ea" font-size="15" font-weight="600">PRAETOR/1</text>
-    <text x="585.877396993703" y="220" fill="#5ce1b0" font-size="15" font-weight="700">2,177</text>
-
-    <rect x="250" y="250" width="660" height="34" rx="7" fill="#152027" stroke="#22323a"/>
-    <rect x="250" y="250" width="611.1111111111111" height="34" rx="7" fill="#6aa9ff"/>
-    <text x="56" y="272" fill="#e7f2ea" font-size="15" font-weight="600">WireGuard</text>
-    <text x="871.1111111111111" y="272" fill="#6aa9ff" font-size="15" font-weight="700">4,082</text>
-    <text x="984" y="220" fill="#8fa6a1" font-size="13" text-anchor="end">PRAETOR 0.53×</text>
+    <text x="619.0701092388393" y="220" fill="#5ce1b0" font-size="15" font-weight="700">2,257</text>
+    <rect x="250" y="248" width="660" height="34" rx="7" fill="#152027" stroke="#22323a"/>
+    <rect x="250" y="248" width="611.1111111111111" height="34" rx="7" fill="#6aa9ff"/>
+    <text x="56" y="270" fill="#e7f2ea" font-size="15" font-weight="600">WireGuard</text>
+    <text x="871.1111111111111" y="270" fill="#6aa9ff" font-size="15" font-weight="700">3,842</text>
   </g>
   
   <g>
-    <text x="56" y="356" fill="#e7f2ea" font-size="19" font-weight="700">1 KiB authenticated roundtrips</text>
-    <text x="56" y="378" fill="#8fa6a1" font-size="13">one cell or one WireGuard transport packet · roundtrips/s</text>
-    <rect x="250" y="398" width="660" height="34" rx="7" fill="#152027" stroke="#22323a"/>
-    <rect x="250" y="398" width="85.09250598393022" height="34" rx="7" fill="#5ce1b0"/>
-    <text x="56" y="420" fill="#e7f2ea" font-size="15" font-weight="600">PRAETOR/1</text>
-    <text x="345.0925059839302" y="420" fill="#5ce1b0" font-size="15" font-weight="700">129,805</text>
-
-    <rect x="250" y="450" width="660" height="34" rx="7" fill="#152027" stroke="#22323a"/>
-    <rect x="250" y="450" width="611.1111111111111" height="34" rx="7" fill="#6aa9ff"/>
-    <text x="56" y="472" fill="#e7f2ea" font-size="15" font-weight="600">WireGuard</text>
-    <text x="871.1111111111111" y="472" fill="#6aa9ff" font-size="15" font-weight="700">932,223</text>
-    <text x="984" y="420" fill="#8fa6a1" font-size="13" text-anchor="end">PRAETOR 0.14×</text>
+    <text x="56" y="376" fill="#e7f2ea" font-size="19" font-weight="700">1 KiB authenticated roundtrips</text>
+    <text x="56" y="398" fill="#8fa6a1" font-size="13">one fixed cell or one WireGuard transport packet · roundtrips/s</text>
+    
+    <rect x="250" y="418" width="660" height="34" rx="7" fill="#152027" stroke="#22323a"/>
+    <rect x="250" y="418" width="39.4028613542261" height="34" rx="7" fill="#5ce1b0"/>
+    <text x="56" y="440" fill="#e7f2ea" font-size="15" font-weight="600">PRAETOR PSEAL</text>
+    <text x="299.4028613542261" y="440" fill="#5ce1b0" font-size="15" font-weight="700">121,023</text>
+    <rect x="250" y="468" width="660" height="34" rx="7" fill="#152027" stroke="#22323a"/>
+    <rect x="250" y="468" width="611.1111111111111" height="34" rx="7" fill="#ffc46b"/>
+    <text x="56" y="490" fill="#e7f2ea" font-size="15" font-weight="600">PRAETOR FAST</text>
+    <text x="871.1111111111111" y="490" fill="#ffc46b" font-size="15" font-weight="700">1,876,983</text>
+    <rect x="250" y="518" width="660" height="34" rx="7" fill="#152027" stroke="#22323a"/>
+    <rect x="250" y="518" width="297.5128196927538" height="34" rx="7" fill="#6aa9ff"/>
+    <text x="56" y="540" fill="#e7f2ea" font-size="15" font-weight="600">WireGuard</text>
+    <text x="557.5128196927537" y="540" fill="#6aa9ff" font-size="15" font-weight="700">913,789</text>
   </g>
   
   <g>
-    <text x="56" y="556" fill="#e7f2ea" font-size="19" font-weight="700">60 KB full-path throughput</text>
-    <text x="56" y="578" fill="#8fa6a1" font-size="13">fixed-cell framing vs WireGuard transport packet · MiB/s</text>
-    <rect x="250" y="598" width="660" height="34" rx="7" fill="#152027" stroke="#22323a"/>
-    <rect x="250" y="598" width="67.12266819712676" height="34" rx="7" fill="#5ce1b0"/>
-    <text x="56" y="620" fill="#e7f2ea" font-size="15" font-weight="600">PRAETOR/1</text>
-    <text x="327.12266819712676" y="620" fill="#5ce1b0" font-size="15" font-weight="700">131.1</text>
-
-    <rect x="250" y="650" width="660" height="34" rx="7" fill="#152027" stroke="#22323a"/>
-    <rect x="250" y="650" width="611.1111111111111" height="34" rx="7" fill="#6aa9ff"/>
-    <text x="56" y="672" fill="#e7f2ea" font-size="15" font-weight="600">WireGuard</text>
-    <text x="871.1111111111111" y="672" fill="#6aa9ff" font-size="15" font-weight="700">1193.2</text>
-    <text x="984" y="620" fill="#8fa6a1" font-size="13" text-anchor="end">PRAETOR 0.11×</text>
+    <text x="56" y="606" fill="#e7f2ea" font-size="19" font-weight="700">60 KB full-path throughput</text>
+    <text x="56" y="628" fill="#8fa6a1" font-size="13">fixed-cell framing vs WireGuard transport packet · MiB/s</text>
+    
+    <rect x="250" y="648" width="660" height="34" rx="7" fill="#152027" stroke="#22323a"/>
+    <rect x="250" y="648" width="22.6675954464426" height="34" rx="7" fill="#5ce1b0"/>
+    <text x="56" y="670" fill="#e7f2ea" font-size="15" font-weight="600">PRAETOR PSEAL</text>
+    <text x="282.6675954464426" y="670" fill="#5ce1b0" font-size="15" font-weight="700">120.9</text>
+    <rect x="250" y="698" width="660" height="34" rx="7" fill="#152027" stroke="#22323a"/>
+    <rect x="250" y="698" width="611.1111111111111" height="34" rx="7" fill="#ffc46b"/>
+    <text x="56" y="720" fill="#e7f2ea" font-size="15" font-weight="600">PRAETOR FAST</text>
+    <text x="871.1111111111111" y="720" fill="#ffc46b" font-size="15" font-weight="700">3260.8</text>
+    <rect x="250" y="748" width="660" height="34" rx="7" fill="#152027" stroke="#22323a"/>
+    <rect x="250" y="748" width="219.14513391703102" height="34" rx="7" fill="#6aa9ff"/>
+    <text x="56" y="770" fill="#e7f2ea" font-size="15" font-weight="600">WireGuard</text>
+    <text x="479.145133917031" y="770" fill="#6aa9ff" font-size="15" font-weight="700">1169.3</text>
   </g>
-  <text x="56" y="750" fill="#8fa6a1" font-size="12">PRAETOR includes two-pass SIV, a 32-byte commitment tag, 80-byte fixed-cell framing and an ML-KEM-768 hybrid handshake.</text>
-  <text x="56" y="768" fill="#8fa6a1" font-size="12">WireGuard is Cloudflare boringtun 0.7.1 userspace (NoiseIK, X25519, ChaCha20-Poly1305); no TUN/UDP, so these are protocol CPU costs, not VPN wall-clock.</text>
+  <text x="56" y="826" fill="#8fa6a1" font-size="12">FAST: 2.05× WireGuard's 1 KiB roundtrip rate and 2.79× its 60 KB throughput on this CPU; both use assembly AEAD backends (ring).</text>
+  <text x="56" y="844" fill="#8fa6a1" font-size="12">FAST is weaker by design: no SIV, no per-cell key commitment, and a 32-bit cell counter that caps one key at 2^32 cells. PSEAL remains the default.</text>
+  <text x="56" y="862" fill="#8fa6a1" font-size="12">PSEAL pays for two-pass SIV, a 32-byte commitment tag, 80-byte cells and an ML-KEM-768 handshake; handshakes are 0.59× WireGuard's.</text>
+  <text x="56" y="880" fill="#8fa6a1" font-size="12">WireGuard is Cloudflare boringtun 0.7.1 userspace (NoiseIK, X25519, ChaCha20-Poly1305); no TUN/UDP, so these are protocol CPU costs, not VPN wall-clock.</text>
 </svg>

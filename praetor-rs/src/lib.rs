@@ -6,6 +6,7 @@
 pub mod aead;
 pub mod container;
 pub mod error;
+pub mod fast;
 pub mod guard;
 pub mod handshake;
 pub mod padme;

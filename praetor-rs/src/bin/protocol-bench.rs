@@ -5,6 +5,7 @@ use std::time::Instant;
 
 use serde_json::json;
 use praetor::aead::SealKey;
+use praetor::fast::FastChannel;
 use praetor::handshake;
 use praetor::wire::{Received, SecureChannel};
 
@@ -77,6 +78,40 @@ fn main() {
         }));
     }
 
+    // PRAETOR/FAST: one AES-256-GCM pass per fixed cell, no SIV/commitment.
+    let mut fast_cells = Vec::new();
+    for (size, cell_size) in [(1008usize, 1024usize), (60_000, 65_519)] {
+        let (mut a, mut b) = (
+            FastChannel::new([1u8; 32], [2u8; 32], cell_size, 64 << 20).unwrap(),
+            FastChannel::new([2u8; 32], [1u8; 32], cell_size, 64 << 20).unwrap(),
+        );
+        let payload = vec![9u8; size];
+        let iters = if size >= 60_000 { 2000 } else { 20_000 };
+        for _ in 0..3 {
+            for mut cell in a.send(&payload).unwrap() {
+                if let Received::Complete { data, .. } = b.receive(&mut cell).unwrap() {
+                    black_box(data);
+                }
+            }
+        }
+        let start = Instant::now();
+        for _ in 0..iters {
+            for mut cell in a.send(&payload).unwrap() {
+                if let Received::Complete { data, .. } = b.receive(&mut cell).unwrap() {
+                    black_box(data);
+                }
+            }
+        }
+        let secs = start.elapsed().as_secs_f64();
+        let ops = iters as f64 / secs;
+        fast_cells.push(json!({
+            "size": size,
+            "cell_size": cell_size,
+            "ops_s": ops,
+            "mib_s": (size as f64 * ops) / (1024.0 * 1024.0),
+        }));
+    }
+
     println!(
         "{}",
         serde_json::to_string_pretty(&json!({
@@ -84,6 +119,7 @@ fn main() {
             "cpu": "same machine, single thread",
             "handshake_ops_s": hs,
             "cells": cells,
+            "fast_cells": fast_cells,
             "transport": transport,
         }))
         .unwrap()

@@ -38,7 +38,10 @@ impl Cell {
     }
 }
 
-pub fn pack_cell(cell: &Cell, cell_size: usize) -> Result<Vec<u8>> {
+fn pack_cell_inner(cell: &Cell, cell_size: usize, out: &mut [u8], random_pad: bool) -> Result<()> {
+    if out.len() != cell_size {
+        return Err(Error::Range);
+    }
     if cell_size < CELL_HEADER_BYTES + 1 || cell_size > MAX_CELL_SIZE {
         return Err(Error::Range);
     }
@@ -51,7 +54,6 @@ pub fn pack_cell(cell: &Cell, cell_size: usize) -> Result<Vec<u8>> {
     if cell.kind > CELL_FIN {
         return Err(Error::Range);
     }
-    let mut out = vec![0u8; cell_size];
     out[0] = cell.kind;
     out[1] = cell.flags;
     out[2..4].copy_from_slice(&cell.frag_index.to_be_bytes());
@@ -61,8 +63,29 @@ pub fn pack_cell(cell: &Cell, cell_size: usize) -> Result<Vec<u8>> {
     out[16..16 + cell.payload.len()].copy_from_slice(&cell.payload);
     let pad_from = 16 + cell.payload.len();
     if pad_from < cell_size {
-        getrandom::getrandom(&mut out[pad_from..]).map_err(|_| Error::Malformed)?;
+        if random_pad {
+            getrandom::getrandom(&mut out[pad_from..]).map_err(|_| Error::Malformed)?;
+        } else {
+            out[pad_from..].fill(0);
+        }
     }
+    Ok(())
+}
+
+pub fn pack_cell_into(cell: &Cell, cell_size: usize, out: &mut [u8]) -> Result<()> {
+    pack_cell_inner(cell, cell_size, out, true)
+}
+
+/// Zero padding is safe for an authenticated fixed cell: the plaintext pad is
+/// encrypted, and the wire length already hides payload length. FAST uses this
+/// to avoid a syscall per cell.
+pub fn pack_cell_into_zero(cell: &Cell, cell_size: usize, out: &mut [u8]) -> Result<()> {
+    pack_cell_inner(cell, cell_size, out, false)
+}
+
+pub fn pack_cell(cell: &Cell, cell_size: usize) -> Result<Vec<u8>> {
+    let mut out = vec![0u8; cell_size];
+    pack_cell_into(cell, cell_size, &mut out)?;
     Ok(out)
 }
 
