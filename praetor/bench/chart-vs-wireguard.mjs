@@ -44,13 +44,17 @@ function panel(y, title, note, rows, format, unit) {
   const max = Math.max(...rows.map(([, value]) => value)) * 1.08;
   const top = y + 42;
   const bars = rows
-    .map(([label, value, color], i) => {
+    .map(([label, value, color, annotation], i) => {
       const width = (value / max) * TRACK;
       const row = top + i * 50;
+      const note = annotation
+        ? `<text x="${LEFT - 16}" y="${row + 22}" text-anchor="end" fill="${MUTED}" font-size="13" font-weight="600">${annotation}</text>`
+        : '';
       return `
     <rect x="${LEFT}" y="${row}" width="${TRACK}" height="34" rx="7" fill="#152027" stroke="${GRID}"/>
     <rect x="${LEFT}" y="${row}" width="${Math.max(2, width)}" height="34" rx="7" fill="${color}"/>
     <text x="56" y="${row + 22}" fill="${INK}" font-size="15" font-weight="600">${label}</text>
+    ${note}
     <text x="${LEFT + Math.max(width, 2) + 10}" y="${row + 22}" fill="${color}" font-size="15" font-weight="700">${format(value)}</text>`;
     })
     .join('');
@@ -79,11 +83,11 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" 
     <text x="${W - 118}" y="58" fill="${INK}" font-size="13">WireGuard</text>
   </g>
   <line x1="56" y1="116" x2="${W - 56}" y2="116" stroke="${GRID}"/>
-  ${panel(156, 'Handshakes per second', 'PSEAL, FAST and BOLT share this handshake, so those bars are identical', [
-    ['PRAETOR PSEAL', praetor.handshake_ops_s, MINT],
-    ['PRAETOR FAST', praetor.handshake_ops_s, AMBER],
-    ['PRAETOR BOLT', praetor.handshake_ops_s, VIOLET],
-    ['WireGuard', wg.handshake_ops_s, BLUE],
+  ${panel(156, 'Handshakes per second', 'PSEAL, FAST and BOLT share this handshake; ratios are versus WireGuard', [
+    ['PRAETOR PSEAL', praetor.handshake_ops_s, MINT, `${ratio(praetor.handshake_ops_s, wg.handshake_ops_s)}×`],
+    ['PRAETOR FAST', praetor.handshake_ops_s, AMBER, `${ratio(praetor.handshake_ops_s, wg.handshake_ops_s)}×`],
+    ['PRAETOR BOLT', praetor.handshake_ops_s, VIOLET, `${ratio(praetor.handshake_ops_s, wg.handshake_ops_s)}×`],
+    ['WireGuard', wg.handshake_ops_s, BLUE, '1.00×'],
   ], fmtInt, 'ops/s')}
   ${panel(406, '1 KiB authenticated roundtrips', 'one fixed cell or one WireGuard transport packet', [
     ['PRAETOR PSEAL', praetor1k.ops_s, MINT],

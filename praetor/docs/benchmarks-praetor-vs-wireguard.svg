@@ -18,23 +18,27 @@
   
   <g>
     <text x="56" y="156" fill="#e7f2ea" font-size="19" font-weight="700">Handshakes per second</text>
-    <text x="56" y="178" fill="#8fa6a1" font-size="13">PSEAL, FAST and BOLT share this handshake, so those bars are identical · ops/s</text>
+    <text x="56" y="178" fill="#8fa6a1" font-size="13">PSEAL, FAST and BOLT share this handshake; ratios are versus WireGuard · ops/s</text>
     
     <rect x="250" y="198" width="660" height="34" rx="7" fill="#152027" stroke="#22323a"/>
     <rect x="250" y="198" width="369.5376863024244" height="34" rx="7" fill="#5ce1b0"/>
     <text x="56" y="220" fill="#e7f2ea" font-size="15" font-weight="600">PRAETOR PSEAL</text>
+    <text x="234" y="220" text-anchor="end" fill="#8fa6a1" font-size="13" font-weight="600">0.60×</text>
     <text x="629.5376863024244" y="220" fill="#5ce1b0" font-size="15" font-weight="700">2,611</text>
     <rect x="250" y="248" width="660" height="34" rx="7" fill="#152027" stroke="#22323a"/>
     <rect x="250" y="248" width="369.5376863024244" height="34" rx="7" fill="#ffc46b"/>
     <text x="56" y="270" fill="#e7f2ea" font-size="15" font-weight="600">PRAETOR FAST</text>
+    <text x="234" y="270" text-anchor="end" fill="#8fa6a1" font-size="13" font-weight="600">0.60×</text>
     <text x="629.5376863024244" y="270" fill="#ffc46b" font-size="15" font-weight="700">2,611</text>
     <rect x="250" y="298" width="660" height="34" rx="7" fill="#152027" stroke="#22323a"/>
     <rect x="250" y="298" width="369.5376863024244" height="34" rx="7" fill="#c9a2ff"/>
     <text x="56" y="320" fill="#e7f2ea" font-size="15" font-weight="600">PRAETOR BOLT</text>
+    <text x="234" y="320" text-anchor="end" fill="#8fa6a1" font-size="13" font-weight="600">0.60×</text>
     <text x="629.5376863024244" y="320" fill="#c9a2ff" font-size="15" font-weight="700">2,611</text>
     <rect x="250" y="348" width="660" height="34" rx="7" fill="#152027" stroke="#22323a"/>
     <rect x="250" y="348" width="611.1111111111111" height="34" rx="7" fill="#6aa9ff"/>
     <text x="56" y="370" fill="#e7f2ea" font-size="15" font-weight="600">WireGuard</text>
+    <text x="234" y="370" text-anchor="end" fill="#8fa6a1" font-size="13" font-weight="600">1.00×</text>
     <text x="871.1111111111111" y="370" fill="#6aa9ff" font-size="15" font-weight="700">4,317</text>
   </g>
   
@@ -45,18 +49,22 @@
     <rect x="250" y="448" width="660" height="34" rx="7" fill="#152027" stroke="#22323a"/>
     <rect x="250" y="448" width="23.223054850408527" height="34" rx="7" fill="#5ce1b0"/>
     <text x="56" y="470" fill="#e7f2ea" font-size="15" font-weight="600">PRAETOR PSEAL</text>
+    
     <text x="283.2230548504085" y="470" fill="#5ce1b0" font-size="15" font-weight="700">147,264</text>
     <rect x="250" y="498" width="660" height="34" rx="7" fill="#152027" stroke="#22323a"/>
     <rect x="250" y="498" width="508.29080490643736" height="34" rx="7" fill="#ffc46b"/>
     <text x="56" y="520" fill="#e7f2ea" font-size="15" font-weight="600">PRAETOR FAST</text>
+    
     <text x="768.2908049064374" y="520" fill="#ffc46b" font-size="15" font-weight="700">3,223,207</text>
     <rect x="250" y="548" width="660" height="34" rx="7" fill="#152027" stroke="#22323a"/>
     <rect x="250" y="548" width="611.1111111111111" height="34" rx="7" fill="#c9a2ff"/>
     <text x="56" y="570" fill="#e7f2ea" font-size="15" font-weight="600">PRAETOR BOLT</text>
+    
     <text x="871.1111111111111" y="570" fill="#c9a2ff" font-size="15" font-weight="700">3,875,218</text>
     <rect x="250" y="598" width="660" height="34" rx="7" fill="#152027" stroke="#22323a"/>
     <rect x="250" y="598" width="153.4527199873715" height="34" rx="7" fill="#6aa9ff"/>
     <text x="56" y="620" fill="#e7f2ea" font-size="15" font-weight="600">WireGuard</text>
+    
     <text x="413.4527199873715" y="620" fill="#6aa9ff" font-size="15" font-weight="700">973,084</text>
   </g>
   
@@ -67,18 +75,22 @@
     <rect x="250" y="698" width="660" height="34" rx="7" fill="#152027" stroke="#22323a"/>
     <rect x="250" y="698" width="15.002218519339806" height="34" rx="7" fill="#5ce1b0"/>
     <text x="56" y="720" fill="#e7f2ea" font-size="15" font-weight="600">PRAETOR PSEAL</text>
+    
     <text x="275.0022185193398" y="720" fill="#5ce1b0" font-size="15" font-weight="700">143.1</text>
     <rect x="250" y="748" width="660" height="34" rx="7" fill="#152027" stroke="#22323a"/>
     <rect x="250" y="748" width="455.5258077787272" height="34" rx="7" fill="#ffc46b"/>
     <text x="56" y="770" fill="#e7f2ea" font-size="15" font-weight="600">PRAETOR FAST</text>
+    
     <text x="715.5258077787272" y="770" fill="#ffc46b" font-size="15" font-weight="700">4346.0</text>
     <rect x="250" y="798" width="660" height="34" rx="7" fill="#152027" stroke="#22323a"/>
     <rect x="250" y="798" width="611.1111111111111" height="34" rx="7" fill="#c9a2ff"/>
     <text x="56" y="820" fill="#e7f2ea" font-size="15" font-weight="600">PRAETOR BOLT</text>
+    
     <text x="871.1111111111111" y="820" fill="#c9a2ff" font-size="15" font-weight="700">5830.4</text>
     <rect x="250" y="848" width="660" height="34" rx="7" fill="#152027" stroke="#22323a"/>
     <rect x="250" y="848" width="136.65602975449278" height="34" rx="7" fill="#6aa9ff"/>
     <text x="56" y="870" fill="#e7f2ea" font-size="15" font-weight="600">WireGuard</text>
+    
     <text x="396.6560297544928" y="870" fill="#6aa9ff" font-size="15" font-weight="700">1303.8</text>
   </g>
   <text x="56" y="906" fill="#8fa6a1" font-size="12">BOLT: 3.98× WireGuard's 1 KiB roundtrip rate and 4.47× its 60 KB throughput on this CPU.</text>
