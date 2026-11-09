@@ -35,14 +35,17 @@ and reassembly end to end. `pseal` includes two passes (SIV prefix + AEAD) and
 | pseal.open | 60,000 | 655.8 | 11,462 |
 | pseal.seal | 1,048,576 | 498.9 | 499 |
 | pseal.open | 1,048,576 | 570.8 | 571 |
-| kem.decaps | — | — | 10,364 |
-| handshake.full | — | — | 2,611 |
+| kem.decaps (libcrux AVX2) | — | — | 68,309 |
+| handshake.full | — | — | 3,487 |
 
 Derived ops/s for sub-megabyte rows are computed from the measured MiB/s; the
 1 MiB and handshake rows are direct iteration counts. The handshake figure
 includes two X-Wing key generations, two encapsulations, two decapsulations,
-transcript hashing and both confirmations. Rows below 1 MiB come from the same
-three-run `protocol-bench` session as the WireGuard comparison below.
+transcript hashing and both confirmations. The handshake and transport rows
+come from separate three-run sessions on the same machine. The handshake now
+uses libcrux's AVX2-dispatched ML-KEM-768 and reuses the X25519 public key each
+side already holds during decapsulation; the previous portable `ml-kem`
+backend measured 10,364 decaps/s.
 
 ## What the numbers mean
 
@@ -70,7 +73,7 @@ decrypts it with Rust, then the reverse, comparing the recovered bytes.
 
 | Metric | PSEAL (default) | FAST | BOLT | WireGuard (boringtun 0.7.1) | PSEAL / WG | FAST / WG | BOLT / WG |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| Full handshakes/s | 2,611 | 2,611 | 2,611 | 4,317 | 0.60× | 0.60× | 0.60× |
+| Full handshakes/s | 3,487 | 3,487 | 3,487 | 4,042 | 0.86× | 0.86× | 0.86× |
 | 1 KiB authenticated roundtrips/s | 147,264 | 3,223,207 | 3,875,218 | 973,084 | 0.15× | 3.31× | **3.98×** |
 | 60 KB full-path throughput | 143.1 MiB/s | 4,346.0 MiB/s | 5,830.4 MiB/s | 1,303.8 MiB/s | 0.11× | 3.33× | **4.47×** |
 | 60 KB PSEAL seal+open (no cell framing) | 282.2 MiB/s | — | — | — | — | — | — |
@@ -116,6 +119,25 @@ in-place decrypt). No primitive or framing changed.
 | `ring` AES-256-GCM, owned API | 2,412,138 | 4,029.9 |
 | `ring` AES-256-GCM, zero-copy API | 3,223,207 | 4,346.0 |
 
+### Why the handshake got faster
+
+The handshake was not X25519-bound at first. ML-KEM-768 was running through
+the portable `ml-kem` crate: about 33 µs keygen, 31 µs encapsulation and 39 µs
+decapsulation on this CPU. The same standard ML-KEM-768 through libcrux's
+AVX2-dispatched implementation measures about 12–13 µs per operation and is
+byte-compatible; the cross-language decapsulation vector still passes.
+
+The second cost was redundant. `xwing::decapsulate` rebuilt its own X25519
+public key from the secret key on every call, a base-point scalar
+multiplication that both sides already had. The handshake now passes the
+cached key into `decapsulate_with_pk`.
+
+Together these took the steady-state four-message handshake from about 383 µs
+to about 251 µs. The published 3,487/s is the median of three short
+`protocol-bench` runs, which start cold; the longer phase profile settles at
+about 3,986/s. WireGuard's same-session median is 4,042/s, so the remaining gap
+is a few percent, not the 40% it was.
+
 ### Why BOLT is faster still
 
 AEGIS-128L keeps eight 128-bit state blocks and absorbs 32 bytes per step with
@@ -132,8 +154,9 @@ The remaining differences are protocol-level:
 
 * A fixed cell is one AEAD pass over a pre-sized buffer plus a 16-byte header,
   with no IP header parse, route lookup or per-packet session transition.
-* The handshake gap does not close. X25519 + ML-KEM-768 costs about 1.7×
-  X25519 alone, and all PRAETOR profiles pay it.
+* The handshake gap is now small. It is dominated by four X25519 DH
+  operations at about 35 µs each; ML-KEM is no longer the bottleneck. Closing
+  the last few percent needs a protocol-level change, not a faster cipher.
 * AES acceleration is required for the transport win. Without AES-NI, AEGIS
   falls back to software AES and can be slower than PSEAL.
 

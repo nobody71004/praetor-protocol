@@ -3,7 +3,7 @@
   "cpu": "same machine, single thread",
   "runs": 3,
   "aggregation": "median",
-  "handshake_ops_s": 2610.5979835741177,
+  "handshake_ops_s": 3486.6328308320612,
   "cells": [
     {
       "mib_s": 141.56500978529562,

@@ -26,7 +26,7 @@ fn main() {
     let hs_iters = 300usize;
     let hs = rate(hs_iters, || {
         let (c1, mut cs) = handshake::client_init(&server_pk).unwrap();
-        let (s1, mut ss) = handshake::server_respond(&server_sk, &c1).unwrap();
+        let (s1, mut ss) = handshake::server_respond_with_pk(&server_pk, &server_sk, &c1).unwrap();
         let (confirm, _) = handshake::client_finish(&mut cs, &s1).unwrap();
         black_box(handshake::server_finish(&mut ss, &confirm).unwrap());
     });

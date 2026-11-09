@@ -18,7 +18,7 @@ build the wire bytes in a reused buffer, then borrow the plaintext back out.
 |---|---:|---:|---:|---:|---:|
 | 1 KiB authenticated roundtrips/s | 147,264 | 3,223,207 | **3,875,218** | 973,084 | **3.98×** |
 | 60 KB full-path throughput | 143.1 MiB/s | 4,346.0 MiB/s | **5,830.4 MiB/s** | 1,303.8 MiB/s | **4.47×** |
-| Full handshakes/s | 2,611 | 2,611 | 2,611 | 4,317 | 0.60× |
+| Full handshakes/s | 3,487 | 3,487 | 3,487 | 4,042 | 0.86× |
 
 BOLT is **1.20× FAST at 1 KiB** and **1.34× FAST at 60 KB** under the same
 calling convention. The 60 KB row measured 5,812–5,976 MiB/s across the three

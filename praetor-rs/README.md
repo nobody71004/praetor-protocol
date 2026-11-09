@@ -68,8 +68,8 @@ Measured on the development machine (Windows x64, release):
 |---|---:|
 | PSEAL seal, 1 MiB | 498.9 MiB/s |
 | PSEAL open, 1 MiB | 570.8 MiB/s |
-| X-Wing decapsulation | 10,364 ops/s |
-| Full handshake | 2,611 ops/s |
+| X-Wing decapsulation (libcrux AVX2) | 68,309 ops/s |
+| Full handshake | 3,487 ops/s |
 | FAST 1 KiB roundtrips (zero-copy) | 3,223,207 ops/s |
 | FAST 60 KB full path (zero-copy) | 4,346.0 MiB/s |
 | BOLT 1 KiB roundtrips (zero-copy) | 3,875,218 ops/s |
@@ -78,15 +78,17 @@ Measured on the development machine (Windows x64, release):
 BOLT uses AEGIS-128L through the `aegis` crate; FAST uses `ring`'s
 AES-256-GCM. In the same session BOLT beats userspace WireGuard by 3.98× on
 1 KiB roundtrips and 4.47× on 60 KB throughput, and beats FAST by 1.20× and
-1.34×. The ML-KEM-768 handshake remains 0.60×. See
+1.34×. The ML-KEM-768 handshake is now 0.86× (up from 0.60×) after switching
+to libcrux's AVX2 implementation and reusing cached X25519 public keys in
+decapsulation; X25519 DH is what remains. See
 `../praetor/docs/BOLT.md` and `../praetor/docs/FAST.md` for the tradeoffs and
 `../praetor/docs/BENCHMARKS.md` for methodology.
 
 ## Security notes
 
 * The crate uses `chacha20poly1305`, `ring` (AES-256-GCM for PRAETOR/FAST),
-  `aegis` (AEGIS-128L for PRAETOR/BOLT), `ml-kem 0.2.3`, `x25519-dalek 2`,
-  `sha3`, `hkdf`, `hmac` and `scrypt`. ML-KEM decapsulation is treated as
+  `aegis` (AEGIS-128L for PRAETOR/BOLT), `libcrux-ml-kem 0.0.11`,
+  `x25519-dalek 2`, `sha3`, `hkdf`, `hmac` and `scrypt`. ML-KEM decapsulation is treated as
   infallible (implicit rejection); the handshake confirmation is the
   authentication check.
 * `PRAETOR/FAST` is opt-in and deliberately weaker than PSEAL: no SIV, no

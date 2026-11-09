@@ -129,7 +129,7 @@ cd praetor-rs
 
 Measured on one Windows x64 machine, single-threaded: the JS reference seals
 1 MiB at 358 MiB/s and completes 86 handshakes/s; the Rust release build seals
-at 499 MiB/s and completes 2,611 handshakes/s. See
+at 499 MiB/s and completes 3,487 handshakes/s. See
 [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) for the full tables.
 
 There are three transport profiles. **PSEAL** is the default and is **not**
@@ -139,15 +139,16 @@ cells and ML-KEM-768. **PRAETOR/FAST** (AES-256-GCM via `ring`) reaches
 **3.31×** and **3.33×**. **PRAETOR/BOLT** (AEGIS-128L) is the fastest:
 **3.98×** the 1 KiB roundtrip rate and **4.47×** the 60 KB throughput, which
 is 1.20× and 1.34× ahead of FAST under the same zero-copy API. The handshake
-is still **0.60×**, because X25519 + ML-KEM-768 costs more than X25519 alone.
+is now **0.86×** (up from 0.60×); after moving ML-KEM to libcrux's AVX2
+backend, X25519 DH dominates the remaining cost.
 FAST and BOLT are weaker than PSEAL by design; see
 [`docs/FAST.md`](docs/FAST.md) and [`docs/BOLT.md`](docs/BOLT.md).
 
 ![PRAETOR/1 vs WireGuard](docs/benchmarks-praetor-vs-wireguard.svg)
 
 Against Cloudflare `boringtun` 0.7.1 (userspace WireGuard, same CPU, single
-thread), medians of three runs in one session: **2,611 handshakes/s** vs
-**4,317**; PSEAL **147k 1 KiB roundtrips/s** and **143.1 MiB/s** at 60 KB;
+thread), medians of three runs in one session: **3,487 handshakes/s** vs
+**4,042**; PSEAL **147k 1 KiB roundtrips/s** and **143.1 MiB/s** at 60 KB;
 FAST **3.22M** and **4,346.0 MiB/s**; BOLT **3.88M** and **5,830.4 MiB/s**,
 versus WireGuard's **973k** and **1,303.8 MiB/s**. All three PRAETOR transport
 rows use the same zero-copy buffer API as boringtun, so the gap is protocol

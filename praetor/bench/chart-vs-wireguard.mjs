@@ -104,7 +104,7 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" 
   <text x="56" y="906" fill="${MUTED}" font-size="12">BOLT: ${ratio(bolt1k.ops_s, wg1k.ops_s)}× WireGuard's 1 KiB roundtrip rate and ${ratio(bolt60.mib_s, wg60.mib_s)}× its 60 KB throughput on this CPU.</text>
   <text x="56" y="924" fill="${MUTED}" font-size="12">BOLT is AEGIS-128L (ISO/IEC 29192-8) with a 64-bit cell counter and key commitment, but no SIV and only a 128-bit key, so PSEAL remains the default.</text>
   <text x="56" y="942" fill="${MUTED}" font-size="12">FAST is AES-256-GCM via ring: ${ratio(fast1k.ops_s, wg1k.ops_s)}× the 1 KiB rate and ${ratio(fast60.mib_s, wg60.mib_s)}× the 60 KB throughput. PSEAL pays for two-pass SIV, a 32-byte tag and 80-byte cells.</text>
-  <text x="56" y="960" fill="${MUTED}" font-size="12">Handshakes are ${ratio(praetor.handshake_ops_s, wg.handshake_ops_s)}× WireGuard's: X25519 + ML-KEM-768 costs more than X25519 alone. WireGuard is boringtun 0.7.1; no TUN/UDP, so these are protocol CPU costs.</text>
+  <text x="56" y="960" fill="${MUTED}" font-size="12">Handshakes are ${ratio(praetor.handshake_ops_s, wg.handshake_ops_s)}× WireGuard's: X25519 DH dominates; libcrux ML-KEM is no longer the bottleneck. WireGuard is boringtun 0.7.1; no TUN/UDP, so these are protocol CPU costs.</text>
 </svg>
 `;
 

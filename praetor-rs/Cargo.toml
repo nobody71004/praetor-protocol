@@ -28,7 +28,7 @@ getrandom = "0.2"
 rand_core = { version = "0.6", features = ["getrandom"] }
 scrypt = "0.11"
 hex = "0.4"
-ml-kem = "0.2"
+libcrux-ml-kem = { version = "0.0.11", default-features = false, features = ["mlkem768"] }
 x25519-dalek = { version = "2.0", features = ["static_secrets"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

@@ -21,25 +21,25 @@
     <text x="56" y="178" fill="#8fa6a1" font-size="13">PSEAL, FAST and BOLT share this handshake; ratios are versus WireGuard · ops/s</text>
     
     <rect x="250" y="198" width="660" height="34" rx="7" fill="#152027" stroke="#22323a"/>
-    <rect x="250" y="198" width="369.5376863024244" height="34" rx="7" fill="#5ce1b0"/>
+    <rect x="250" y="198" width="527.1321534567833" height="34" rx="7" fill="#5ce1b0"/>
     <text x="56" y="220" fill="#e7f2ea" font-size="15" font-weight="600">PRAETOR PSEAL</text>
-    <text x="234" y="220" text-anchor="end" fill="#8fa6a1" font-size="13" font-weight="600">0.60×</text>
-    <text x="629.5376863024244" y="220" fill="#5ce1b0" font-size="15" font-weight="700">2,611</text>
+    <text x="234" y="220" text-anchor="end" fill="#8fa6a1" font-size="13" font-weight="600">0.86×</text>
+    <text x="787.1321534567833" y="220" fill="#5ce1b0" font-size="15" font-weight="700">3,487</text>
     <rect x="250" y="248" width="660" height="34" rx="7" fill="#152027" stroke="#22323a"/>
-    <rect x="250" y="248" width="369.5376863024244" height="34" rx="7" fill="#ffc46b"/>
+    <rect x="250" y="248" width="527.1321534567833" height="34" rx="7" fill="#ffc46b"/>
     <text x="56" y="270" fill="#e7f2ea" font-size="15" font-weight="600">PRAETOR FAST</text>
-    <text x="234" y="270" text-anchor="end" fill="#8fa6a1" font-size="13" font-weight="600">0.60×</text>
-    <text x="629.5376863024244" y="270" fill="#ffc46b" font-size="15" font-weight="700">2,611</text>
+    <text x="234" y="270" text-anchor="end" fill="#8fa6a1" font-size="13" font-weight="600">0.86×</text>
+    <text x="787.1321534567833" y="270" fill="#ffc46b" font-size="15" font-weight="700">3,487</text>
     <rect x="250" y="298" width="660" height="34" rx="7" fill="#152027" stroke="#22323a"/>
-    <rect x="250" y="298" width="369.5376863024244" height="34" rx="7" fill="#c9a2ff"/>
+    <rect x="250" y="298" width="527.1321534567833" height="34" rx="7" fill="#c9a2ff"/>
     <text x="56" y="320" fill="#e7f2ea" font-size="15" font-weight="600">PRAETOR BOLT</text>
-    <text x="234" y="320" text-anchor="end" fill="#8fa6a1" font-size="13" font-weight="600">0.60×</text>
-    <text x="629.5376863024244" y="320" fill="#c9a2ff" font-size="15" font-weight="700">2,611</text>
+    <text x="234" y="320" text-anchor="end" fill="#8fa6a1" font-size="13" font-weight="600">0.86×</text>
+    <text x="787.1321534567833" y="320" fill="#c9a2ff" font-size="15" font-weight="700">3,487</text>
     <rect x="250" y="348" width="660" height="34" rx="7" fill="#152027" stroke="#22323a"/>
     <rect x="250" y="348" width="611.1111111111111" height="34" rx="7" fill="#6aa9ff"/>
     <text x="56" y="370" fill="#e7f2ea" font-size="15" font-weight="600">WireGuard</text>
     <text x="234" y="370" text-anchor="end" fill="#8fa6a1" font-size="13" font-weight="600">1.00×</text>
-    <text x="871.1111111111111" y="370" fill="#6aa9ff" font-size="15" font-weight="700">4,317</text>
+    <text x="871.1111111111111" y="370" fill="#6aa9ff" font-size="15" font-weight="700">4,042</text>
   </g>
   
   <g>
@@ -96,5 +96,5 @@
   <text x="56" y="906" fill="#8fa6a1" font-size="12">BOLT: 3.98× WireGuard's 1 KiB roundtrip rate and 4.47× its 60 KB throughput on this CPU.</text>
   <text x="56" y="924" fill="#8fa6a1" font-size="12">BOLT is AEGIS-128L (ISO/IEC 29192-8) with a 64-bit cell counter and key commitment, but no SIV and only a 128-bit key, so PSEAL remains the default.</text>
   <text x="56" y="942" fill="#8fa6a1" font-size="12">FAST is AES-256-GCM via ring: 3.31× the 1 KiB rate and 3.33× the 60 KB throughput. PSEAL pays for two-pass SIV, a 32-byte tag and 80-byte cells.</text>
-  <text x="56" y="960" fill="#8fa6a1" font-size="12">Handshakes are 0.60× WireGuard's: X25519 + ML-KEM-768 costs more than X25519 alone. WireGuard is boringtun 0.7.1; no TUN/UDP, so these are protocol CPU costs.</text>
+  <text x="56" y="960" fill="#8fa6a1" font-size="12">Handshakes are 0.86× WireGuard's: X25519 DH dominates; libcrux ML-KEM is no longer the bottleneck. WireGuard is boringtun 0.7.1; no TUN/UDP, so these are protocol CPU costs.</text>
 </svg>

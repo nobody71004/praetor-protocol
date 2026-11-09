@@ -19,7 +19,7 @@ the same zero-copy buffer API as boringtun.
 |---|---:|---:|---:|---:|
 | 1 KiB authenticated roundtrips/s | 147,264 | 3,223,207 | 973,084 | **3.31×** |
 | 60 KB full-path throughput | 143.1 MiB/s | 4,346.0 MiB/s | 1,303.8 MiB/s | **3.33×** |
-| Full handshakes/s | 2,611 | 2,611 | 4,317 | 0.60× |
+| Full handshakes/s | 3,487 | 3,487 | 4,042 | 0.86× |
 
 The handshake gap does not close. It is not affected by the envelope: both
 profiles run X25519 + ML-KEM-768 with two encapsulations and two

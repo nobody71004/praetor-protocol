@@ -3,7 +3,7 @@
   "cpu": "same machine, single thread",
   "runs": 3,
   "aggregation": "median",
-  "handshake_ops_s": 4317.192788561167,
+  "handshake_ops_s": 4042.0984554131273,
   "transport": [
     {
       "size": 1024,

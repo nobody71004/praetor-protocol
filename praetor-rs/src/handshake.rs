@@ -111,6 +111,20 @@ pub fn client_init(server_pk: &[u8]) -> Result<(Vec<u8>, ClientState)> {
 }
 
 pub fn server_respond(server_sk: &[u8], message: &[u8]) -> Result<(Vec<u8>, ServerState)> {
+    let server_pk = xwing::public_from_secret(server_sk)?;
+    server_respond_with_pk(&server_pk, server_sk, message)
+}
+
+/// Like [`server_respond`], but reuses the server's already-computed public
+/// key instead of deriving it from the secret key.
+pub fn server_respond_with_pk(
+    server_pk: &[u8],
+    server_sk: &[u8],
+    message: &[u8],
+) -> Result<(Vec<u8>, ServerState)> {
+    if server_pk.len() != XWING_PK_BYTES {
+        return Err(Error::Key);
+    }
     if message.len() != HS_C1_BYTES {
         return Err(Error::Malformed);
     }
@@ -118,7 +132,9 @@ pub fn server_respond(server_sk: &[u8], message: &[u8]) -> Result<(Vec<u8>, Serv
     let eph_c = &message[XWING_CT_BYTES..XWING_CT_BYTES + XWING_PK_BYTES];
     let nonce_c = &message[XWING_CT_BYTES + XWING_PK_BYTES..];
 
-    let ss1 = xwing::decapsulate(ct1, server_sk)?;
+    let mut server_pk_x = [0u8; 32];
+    server_pk_x.copy_from_slice(&server_pk[xwing::XWING_X25519_PK_OFFSET..][..32]);
+    let ss1 = xwing::decapsulate_with_pk(ct1, server_sk, &server_pk_x)?;
     let (ct2, ss2) = xwing::encapsulate(eph_c)?;
     let nonce_s: [u8; 32] = random_array();
 
@@ -162,7 +178,11 @@ pub fn client_finish(state: &mut ClientState, reply: &[u8]) -> Result<([u8; 32],
     let nonce_s = &reply[XWING_CT_BYTES..XWING_CT_BYTES + 32];
     let confirm_s = &reply[XWING_CT_BYTES + 32..];
 
-    let ss2 = xwing::decapsulate(ct2, &state.eph_secret)?;
+    let mut client_pk_x = [0u8; 32];
+    client_pk_x.copy_from_slice(
+        &state.eph_public[xwing::XWING_X25519_PK_OFFSET..][..32],
+    );
+    let ss2 = xwing::decapsulate_with_pk(ct2, &state.eph_secret, &client_pk_x)?;
     let mut transcript = Vec::with_capacity(state.first.len() + ct2.len() + 32);
     transcript.extend_from_slice(&state.first);
     transcript.extend_from_slice(ct2);
