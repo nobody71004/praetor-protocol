@@ -29,7 +29,7 @@ const fmtOne = (n) => n.toFixed(1);
 const ratio = (v, w) => (v / w).toFixed(2);
 
 const W = 1040;
-const H = 900;
+const H = 980;
 const LEFT = 250;
 const TRACK = 660;
 const MINT = '#5ce1b0';
@@ -79,26 +79,28 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" 
     <text x="${W - 118}" y="58" fill="${INK}" font-size="13">WireGuard</text>
   </g>
   <line x1="56" y1="116" x2="${W - 56}" y2="116" stroke="${GRID}"/>
-  ${panel(156, 'Handshakes per second', 'all three PRAETOR profiles share the hybrid handshake', [
-    ['PRAETOR/1', praetor.handshake_ops_s, MINT],
+  ${panel(156, 'Handshakes per second', 'PSEAL, FAST and BOLT share this handshake, so those bars are identical', [
+    ['PRAETOR PSEAL', praetor.handshake_ops_s, MINT],
+    ['PRAETOR FAST', praetor.handshake_ops_s, AMBER],
+    ['PRAETOR BOLT', praetor.handshake_ops_s, VIOLET],
     ['WireGuard', wg.handshake_ops_s, BLUE],
   ], fmtInt, 'ops/s')}
-  ${panel(376, '1 KiB authenticated roundtrips', 'one fixed cell or one WireGuard transport packet', [
+  ${panel(406, '1 KiB authenticated roundtrips', 'one fixed cell or one WireGuard transport packet', [
     ['PRAETOR PSEAL', praetor1k.ops_s, MINT],
     ['PRAETOR FAST', fast1k.ops_s, AMBER],
     ['PRAETOR BOLT', bolt1k.ops_s, VIOLET],
     ['WireGuard', wg1k.ops_s, BLUE],
   ], fmtInt, 'roundtrips/s')}
-  ${panel(631, '60 KB full-path throughput', 'fixed-cell framing vs WireGuard transport packet', [
+  ${panel(656, '60 KB full-path throughput', 'fixed-cell framing vs WireGuard transport packet', [
     ['PRAETOR PSEAL', praetor60.mib_s, MINT],
     ['PRAETOR FAST', fast60.mib_s, AMBER],
     ['PRAETOR BOLT', bolt60.mib_s, VIOLET],
     ['WireGuard', wg60.mib_s, BLUE],
   ], fmtOne, 'MiB/s')}
-  <text x="56" y="826" fill="${MUTED}" font-size="12">BOLT: ${ratio(bolt1k.ops_s, wg1k.ops_s)}× WireGuard's 1 KiB roundtrip rate and ${ratio(bolt60.mib_s, wg60.mib_s)}× its 60 KB throughput on this CPU.</text>
-  <text x="56" y="844" fill="${MUTED}" font-size="12">BOLT is AEGIS-128L (ISO/IEC 29192-8) with a 64-bit cell counter and key commitment, but no SIV and only a 128-bit key, so PSEAL remains the default.</text>
-  <text x="56" y="862" fill="${MUTED}" font-size="12">FAST is AES-256-GCM via ring: ${ratio(fast1k.ops_s, wg1k.ops_s)}× the 1 KiB rate and ${ratio(fast60.mib_s, wg60.mib_s)}× the 60 KB throughput. PSEAL pays for two-pass SIV, a 32-byte tag and 80-byte cells.</text>
-  <text x="56" y="880" fill="${MUTED}" font-size="12">Handshakes are ${ratio(praetor.handshake_ops_s, wg.handshake_ops_s)}× WireGuard's: X25519 + ML-KEM-768 costs more than X25519 alone. WireGuard is boringtun 0.7.1; no TUN/UDP, so these are protocol CPU costs.</text>
+  <text x="56" y="906" fill="${MUTED}" font-size="12">BOLT: ${ratio(bolt1k.ops_s, wg1k.ops_s)}× WireGuard's 1 KiB roundtrip rate and ${ratio(bolt60.mib_s, wg60.mib_s)}× its 60 KB throughput on this CPU.</text>
+  <text x="56" y="924" fill="${MUTED}" font-size="12">BOLT is AEGIS-128L (ISO/IEC 29192-8) with a 64-bit cell counter and key commitment, but no SIV and only a 128-bit key, so PSEAL remains the default.</text>
+  <text x="56" y="942" fill="${MUTED}" font-size="12">FAST is AES-256-GCM via ring: ${ratio(fast1k.ops_s, wg1k.ops_s)}× the 1 KiB rate and ${ratio(fast60.mib_s, wg60.mib_s)}× the 60 KB throughput. PSEAL pays for two-pass SIV, a 32-byte tag and 80-byte cells.</text>
+  <text x="56" y="960" fill="${MUTED}" font-size="12">Handshakes are ${ratio(praetor.handshake_ops_s, wg.handshake_ops_s)}× WireGuard's: X25519 + ML-KEM-768 costs more than X25519 alone. WireGuard is boringtun 0.7.1; no TUN/UDP, so these are protocol CPU costs.</text>
 </svg>
 `;
 
