@@ -128,10 +128,9 @@ PMARINE's SIV envelope and fixed-cell channel, alongside BOLT, and prints JSON:
 ```
 
 On this machine (i9-14900HX, VAES/AVX2), the parallel lanes do not close the
-BOLT gap: at 1 KiB the channel is 0.15–0.16× BOLT for all three variants, and at
-60 KB 0.16–0.17×. The serial SIV HMAC dominates the per-cell cost; X2/X4 only
-speed up the AEGIS portion. PMARINE remains a stronger envelope, not a BOLT
-competitor.
+BOLT gap: in the latest run the channel is 0.14–0.15× BOLT at both 1 KiB and
+60 KB. The serial SIV HMAC dominates the per-cell cost; X2/X4 only speed up the
+AEGIS portion. PMARINE remains a stronger envelope, not a BOLT competitor.
 
 ## Security notes
 

@@ -51,9 +51,9 @@ backend measured 10,364 decaps/s.
 
 PMARINE uses AEGIS-256 (RFC 10032) with a full 32-byte SIV and a 32-byte tag,
 while keeping PSEAL's 80-byte envelope and SIV/commitment checks. It is
-Rust-only and is not a fixed-cell transport yet. The PSEAL and PMARINE columns
-below are medians of the same three-run session; the older PSEAL table above is
-from a different session.
+Rust-only; the `PmarineChannel` fixed-cell channel is implemented and measured
+below. The PSEAL and PMARINE columns below are medians of the same three-run
+session; the older PSEAL table above is from a different session.
 
 | operation | bytes | PSEAL MiB/s | PMARINE MiB/s | speedup |
 |---|---:|---:|---:|---:|
@@ -68,6 +68,30 @@ The SIV HMAC is now the dominant cost; the AEGIS-256 pass is much faster.
 PMARINE therefore beats PSEAL but remains below the SIV-free FAST and BOLT
 transport profiles. It is a stronger envelope, not the fastest possible cell
 cipher.
+
+### PMARINE AEGIS lane variants
+
+`pmarine-aegis-bench` compares AEGIS-256, AEGIS-256X2 and AEGIS-256X4 through
+the same SIV envelope and fixed-cell channel, alongside BOLT, in one process.
+Each row is the median of three timed runs after warmup on Windows x64
+(AES/VAES/AVX2, no AVX-512). Run it with:
+
+```bash
+cd praetor-rs
+./cargo.sh run --release --bin pmarine-aegis-bench
+```
+
+| Variant | Envelope 1 KiB seal/open (MiB/s) | Envelope 60 KB seal/open (MiB/s) | Channel 1 KiB | Channel 60 KB |
+|---|---:|---:|---:|---:|
+| AEGIS-256 | 1,384.2 / 1,122.0 | 1,884.7 / 1,888.1 | 621,610 rt/s | 867.8 MiB/s |
+| AEGIS-256X2 | 1,383.5 / 1,109.2 | 2,103.8 / 2,047.6 | 627,274 rt/s | 935.6 MiB/s |
+| AEGIS-256X4 | 1,326.8 / 1,076.6 | 2,109.2 / 2,097.3 | 587,889 rt/s | 947.8 MiB/s |
+
+BOLT's fixed-cell channel measured 4,165.2 MiB/s at 1 KiB and 6,246.8 MiB/s at
+60 KB in the same run. PMARINE's channel is 0.14–0.15× BOLT. The serial
+HMAC-SHA256 SIV is the bottleneck: 1,761.5 MiB/s at 1 KiB and 2,386.9 MiB/s at
+60 KB. Parallel AEGIS lanes improve the envelope, but not enough to close the
+gap. PMARINE remains a stronger envelope, not a BOLT competitor.
 
 ## What the numbers mean
 

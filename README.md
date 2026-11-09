@@ -113,6 +113,52 @@ PMARINE keeps the same envelope shape but replaces the inner AEAD and separate c
 
 ---
 
+## Benchmarks
+
+Single process, single thread, release builds on Windows x64. These are protocol CPU costs, not VPN wall-clock numbers: no TUN, UDP, routing, or syscall path is included. Full methodology and earlier runs are in [`praetor/docs/BENCHMARKS.md`](praetor/docs/BENCHMARKS.md).
+
+### Transport profiles
+
+| Workload | PSEAL | FAST | BOLT | WireGuard (boringtun) |
+|---|---:|---:|---:|---:|
+| Full handshakes/s | 3,487 | 3,487 | 3,487 | 4,042 |
+| 1 KiB authenticated roundtrips/s | 147,264 | 3,223,207 | 3,875,218 | 973,084 |
+| 60 KB full-path throughput | 143.1 MiB/s | 4,346.0 MiB/s | 5,830.4 MiB/s | 1,303.8 MiB/s |
+
+The WireGuard column is userspace `boringtun` 0.7.1, not kernel WireGuard. PSEAL pays for two-pass SIV, the independent commitment tag, 80-byte cells and the hybrid handshake; FAST and BOLT are opt-in profiles without SIV.
+
+### PMARINE: SIV + AEGIS-256
+
+`pmarine-aegis-bench` measures AEGIS-256, AEGIS-256X2 and AEGIS-256X4 through the real 80-byte SIV envelope and `PmarineChannel` fixed-cell channel. Results are medians of three timed runs on the same Windows x64 machine (AES/VAES/AVX2; no AVX-512). Run it with:
+
+```bash
+cd praetor-rs
+./cargo.sh run --release --bin pmarine-aegis-bench
+```
+
+#### Envelope throughput (MiB/s)
+
+| PMARINE envelope | AEGIS-256 | AEGIS-256X2 | AEGIS-256X4 |
+|---|---:|---:|---:|
+| 1 KiB seal | 1,384.2 | 1,383.5 | 1,326.8 |
+| 1 KiB open | 1,122.0 | 1,109.2 | 1,076.6 |
+| 60 KB seal | 1,884.7 | 2,103.8 | 2,109.2 |
+| 60 KB open | 1,888.1 | 2,047.6 | 2,097.3 |
+| 1 MiB seal | 1,363.7 | 1,465.2 | 1,443.1 |
+| 1 MiB open | 1,347.5 | 1,451.3 | 1,445.2 |
+
+#### Fixed-cell channel
+
+| PMARINE channel | 1 KiB roundtrips/s | 60 KB throughput | vs BOLT (1 KiB / 60 KB) |
+|---|---:|---:|---:|
+| AEGIS-256 | 621,610 | 867.8 MiB/s | 0.14× / 0.14× |
+| AEGIS-256X2 | 627,274 | 935.6 MiB/s | 0.14× / 0.15× |
+| AEGIS-256X4 | 587,889 | 947.8 MiB/s | 0.14× / 0.15× |
+
+BOLT's fixed-cell channel measured **4,165.2 MiB/s** at 1 KiB and **6,246.8 MiB/s** at 60 KB in the same run. The serial HMAC-SHA256 SIV is now the dominant per-cell cost—the SIV alone measures 1,761.5 MiB/s at 1 KiB and 2,386.9 MiB/s at 60 KB—so X2/X4 speed up only the AEGIS portion and do not close the BOLT gap. PMARINE is the stronger commitment envelope, not a BOLT competitor.
+
+---
+
 ## What ships in the box
 
 | Capability | Status | Details |
