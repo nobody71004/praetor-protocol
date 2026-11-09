@@ -24,7 +24,7 @@
   <code>NODE 20+</code>
   <code>RUST 1.75+</code>
   <code>PRAETOR/1</code>
-  <code>MIT</code>
+  <code>GPL-3.0-or-later</code>
 </p>
 
 > [!WARNING]
@@ -641,7 +641,7 @@ docs/                     README hero and visual assets
 
 ## License
 
-MIT. See the repository license for the exact text.
+GNU General Public License v3.0 or later (GPL-3.0-or-later). See [LICENSE](LICENSE) for the full text. Third-party dependencies retain their own licenses.
 
 <br />
 

@@ -213,4 +213,4 @@ praetor/vectors/    shared cross-language test vectors
 
 ## Licence
 
-MIT.
+GNU General Public License v3.0 or later (GPL-3.0-or-later). See [LICENSE](../LICENSE) for the full text. Third-party dependencies retain their own licenses.

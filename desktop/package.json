@@ -6,7 +6,7 @@
   "type": "module",
   "main": "electron/main.cjs",
   "author": "PRAETOR",
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "scripts": {
     "predev": "npm run build:mcp",
     "dev": "concurrently -k \"vite --host 127.0.0.1\" \"wait-on tcp:5173 && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron .\"",
