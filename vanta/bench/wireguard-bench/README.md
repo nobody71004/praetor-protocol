@@ -18,7 +18,7 @@ cd vanta-rs
 
 # WireGuard userspace
 cd ../vanta/bench/wireguard-bench
-../../vanta-rs/cargo.sh run --release > ../results-wireguard.json
+../../../vanta-rs/cargo.sh run --release > ../results-wireguard.json
 
 # chart
 cd ..
