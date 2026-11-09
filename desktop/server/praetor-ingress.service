@@ -1,0 +1,12 @@
+[Unit]
+Description=Allow PRAETOR egress TCP ingress through Nexus Shield
+After=nexus-shield.service
+PartOf=nexus-shield.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/praetor-ingress-rule.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

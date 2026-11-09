@@ -1,0 +1,157 @@
+import {
+  DEMO_ENDPOINT,
+  DEMO_SERVER_PUBLIC_KEY,
+  PRAETOR_PROTOCOL,
+} from './praetor.js';
+
+export const DEMO_SETTINGS = {
+  accent: 'mint',
+  animations: true,
+  cursorEffects: true,
+  glass: 72,
+  autoConnect: false,
+  launchAtLogin: false,
+  killSwitch: true,
+  dnsLeakProtection: true,
+  allowLan: false,
+  mcpFullControl: false,
+  mcpAllowedRoots: ['C:\\Users\\mattb\\Projects', 'C:\\Users\\mattb\\Downloads'],
+  agentModel: 'gpt-4o-mini',
+  agentBaseUrl: 'https://api.openai.com/v1',
+  heroTitle: 'Network control, without the friction.',
+  headerCaption: 'PRAETOR / CONTROL PLANE 01',
+};
+
+export const DEMO_PROFILES = [
+  {
+    id: 'demo-praetor-pseal',
+    name: 'Nexus PSEAL',
+    description: 'Default PRAETOR/1 profile: SIV + commitment record protection over a pinned hybrid X-Wing handshake.',
+    location: 'Dallas, TX',
+    endpoint: DEMO_ENDPOINT,
+    protocol: PRAETOR_PROTOCOL,
+    suite: 'PSEAL',
+    transport: 'tcp',
+    cellSize: 1024,
+    serverPublicKey: DEMO_SERVER_PUBLIC_KEY,
+    autoConnect: true,
+    tags: ['pq', 'siv', 'default'],
+    color: 'mint',
+    createdAt: '2026-11-09T09:14:00.000Z',
+    updatedAt: '2026-11-09T09:14:00.000Z',
+  },
+  {
+    id: 'demo-praetor-fast',
+    name: 'Nexus FAST',
+    description: 'Routing profile for throughput-sensitive sessions; the current egress negotiates PSEAL.',
+    location: 'Dallas, TX',
+    endpoint: DEMO_ENDPOINT,
+    protocol: PRAETOR_PROTOCOL,
+    suite: 'FAST',
+    transport: 'tcp',
+    cellSize: 1024,
+    serverPublicKey: DEMO_SERVER_PUBLIC_KEY,
+    autoConnect: false,
+    tags: ['pq', 'aes-gcm', 'opt-in'],
+    color: 'violet',
+    createdAt: '2026-11-09T09:14:00.000Z',
+    updatedAt: '2026-11-09T09:14:00.000Z',
+  },
+  {
+    id: 'demo-praetor-bolt',
+    name: 'Nexus BOLT',
+    description: 'Routing profile for lower per-cell cost; the current egress negotiates PSEAL.',
+    location: 'Dallas, TX',
+    endpoint: DEMO_ENDPOINT,
+    protocol: PRAETOR_PROTOCOL,
+    suite: 'BOLT',
+    transport: 'tcp',
+    cellSize: 1024,
+    serverPublicKey: DEMO_SERVER_PUBLIC_KEY,
+    autoConnect: false,
+    tags: ['pq', 'aegis', 'opt-in'],
+    color: 'amber',
+    createdAt: '2026-11-09T09:14:00.000Z',
+    updatedAt: '2026-11-09T09:14:00.000Z',
+  },
+  {
+    id: 'demo-praetor-pmarine',
+    name: 'Nexus PMARINE',
+    description: 'Experimental PMARINE (PSEAL/2) preset over AEGIS-256; the current egress negotiates PSEAL.',
+    location: 'Dallas, TX',
+    endpoint: DEMO_ENDPOINT,
+    protocol: PRAETOR_PROTOCOL,
+    suite: 'PMARINE',
+    transport: 'tcp',
+    cellSize: 1024,
+    serverPublicKey: DEMO_SERVER_PUBLIC_KEY,
+    autoConnect: false,
+    tags: ['pq', 'aegis-256', 'experimental'],
+    color: 'ice',
+    createdAt: '2026-11-09T09:14:00.000Z',
+    updatedAt: '2026-11-09T09:14:00.000Z',
+  },
+];
+
+export const DEMO_ACTIVITY = [
+  {
+    id: 'demo-activity-1',
+    kind: 'mcp',
+    title: 'MCP runtime staged',
+    detail: '36 tools ready · supervisor online · audit stream attached',
+    ts: Date.now() - 1000 * 60 * 2,
+  },
+  {
+    id: 'demo-activity-2',
+    kind: 'tunnel',
+    title: 'PRAETOR profile loaded',
+    detail: 'Nexus PSEAL · PRAETOR/1 · 104.251.218.227:9443',
+    ts: Date.now() - 1000 * 60 * 8,
+  },
+  {
+    id: 'demo-activity-3',
+    kind: 'system',
+    title: 'Control plane initialized',
+    detail: 'Local state loaded. PRAETOR/1 egress is available through the Dallas exit.',
+    ts: Date.now() - 1000 * 60 * 42,
+  },
+];
+
+export function buildDemoConfig(roots = DEMO_SETTINGS.mcpAllowedRoots, fullControl = false) {
+  return {
+    mcpServers: {
+      'praetor-computer-use': {
+        command: 'C:\\Program Files\\PRAETOR Command\\PRAETOR Command.exe',
+        args: ['C:\\Users\\mattb\\AppData\\Roaming\\praetor-command\\mcp\\server.mjs'],
+        env: {
+          ELECTRON_RUN_AS_NODE: '1',
+          PRAETOR_MCP_ROOTS: roots.join(';'),
+          PRAETOR_MCP_ALLOW_WRITES: '1',
+          PRAETOR_MCP_ALLOW_SHELL: fullControl ? '1' : '0',
+          PRAETOR_MCP_ALLOW_FULL: fullControl ? '1' : '0',
+        },
+      },
+    },
+  };
+}
+
+export const DEMO_APP_INFO = {
+  name: 'PRAETOR Command',
+  version: '1.0.0',
+  electron: '33.4.11',
+  node: '20.18.0',
+  chrome: '130.0.6723.152',
+  platform: 'win32',
+  arch: 'x64',
+  packaged: false,
+  userData: 'C:\\Users\\mattb\\AppData\\Roaming\\praetor-command',
+  home: 'C:\\Users\\mattb',
+  mcp: {
+    ready: true,
+    path: 'C:\\Users\\mattb\\AppData\\Roaming\\praetor-command\\mcp',
+    serverPath: 'C:\\Users\\mattb\\AppData\\Roaming\\praetor-command\\mcp\\server.mjs',
+    error: null,
+  },
+  dataPlane: 'praetor-egress',
+  browserPreview: true,
+};

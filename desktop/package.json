@@ -1,0 +1,80 @@
+{
+  "name": "praetor-command",
+  "version": "1.0.0",
+  "description": "PRAETOR Command — desktop control plane, agent fabric, and local MCP computer-use server.",
+  "private": true,
+  "type": "module",
+  "main": "electron/main.cjs",
+  "author": "PRAETOR",
+  "license": "MIT",
+  "scripts": {
+    "predev": "npm run build:mcp",
+    "dev": "concurrently -k \"vite --host 127.0.0.1\" \"wait-on tcp:5173 && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron .\"",
+    "build:renderer": "vite build",
+    "build:mcp": "node scripts/build-mcp.mjs",
+    "build": "npm run build:renderer && npm run build:mcp",
+    "dist": "npm run build && electron-builder --win portable",
+    "prestart": "npm run build:mcp",
+    "start": "electron .",
+    "mcp": "node mcp/server.mjs",
+    "mcp:test": "node mcp/agent-pipeline.mjs",
+    "icon": "node scripts/make-icon.mjs"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/sdk": "latest",
+    "@vitejs/plugin-react": "latest",
+    "concurrently": "latest",
+    "cross-env": "latest",
+    "electron": "^33.4.11",
+    "electron-builder": "latest",
+    "esbuild": "latest",
+    "lucide-react": "latest",
+    "png-to-ico": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "vite": "latest",
+    "wait-on": "latest",
+    "zod": "^3.25.0"
+  },
+  "build": {
+    "appId": "io.praetor.command",
+    "productName": "PRAETOR Command",
+    "copyright": "Copyright © 2026 PRAETOR",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "mcp-dist",
+        "to": "mcp"
+      }
+    ],
+    "asar": true,
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "PRAETOR-Command-${version}-portable.${ext}"
+    },
+    "portable": {
+      "artifactName": "PRAETOR-Command-${version}.exe"
+    }
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "electron-winstaller@5.4.0": true,
+    "electron@33.4.11": true
+  }
+}

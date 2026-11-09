@@ -8,7 +8,7 @@ use praetor::aead::SealKey;
 use praetor::bolt::{BoltChannel, BOLT_OVERHEAD};
 use praetor::fast::{FastChannel, FAST_OVERHEAD};
 use praetor::handshake;
-use praetor::pmarine::PmarineKey;
+use praetor::pmarine::{PmarineChannel, PmarineKey, CELL_OVERHEAD};
 use praetor::wire::{Received, ReceivedRef, SecureChannel};
 
 fn rate(iters: usize, mut f: impl FnMut()) -> f64 {
@@ -281,6 +281,49 @@ fn main() {
         }));
     }
 
+    // PRAETOR/PMARINE: the SIV envelope over the same fixed cells, using the
+    // same zero-copy convention as FAST and BOLT: seal into a reused buffer,
+    // then borrow each cell's plaintext straight back out of it.
+    let mut pmarine_cells = Vec::new();
+    for (size, cell_size) in [(1008usize, 1024usize), (60_000, 65_519)] {
+        let cell_len = CELL_OVERHEAD + cell_size;
+        let payload = vec![9u8; size];
+        let iters = if size >= 60_000 { 2000 } else { 20_000 };
+        let mut scratch = Vec::with_capacity(cell_len * 2);
+        let (mut a, mut b) = (
+            PmarineChannel::new([31u8; 32], [32u8; 32], cell_size, 64 << 20).unwrap(),
+            PmarineChannel::new([32u8; 32], [31u8; 32], cell_size, 64 << 20).unwrap(),
+        );
+        for _ in 0..3 {
+            scratch.clear();
+            a.send_into(&payload, &mut scratch).unwrap();
+            for chunk in scratch.chunks_mut(cell_len) {
+                if let ReceivedRef::Complete { data, .. } = b.receive_ref(chunk).unwrap() {
+                    black_box(data);
+                }
+            }
+        }
+        let start = Instant::now();
+        for _ in 0..iters {
+            scratch.clear();
+            a.send_into(black_box(&payload), &mut scratch).unwrap();
+            for chunk in scratch.chunks_mut(cell_len) {
+                if let ReceivedRef::Complete { data, .. } = b.receive_ref(chunk).unwrap() {
+                    black_box(data);
+                }
+            }
+        }
+        let secs = start.elapsed().as_secs_f64();
+        let ops = iters as f64 / secs;
+        pmarine_cells.push(json!({
+            "size": size,
+            "cell_size": cell_size,
+            "overhead": praetor::pmarine::OVERHEAD,
+            "ops_s": ops,
+            "mib_s": (size as f64 * ops) / (1024.0 * 1024.0),
+        }));
+    }
+
     println!(
         "{}",
         serde_json::to_string_pretty(&json!({
@@ -288,6 +331,7 @@ fn main() {
             "cpu": "same machine, single thread",
             "handshake_ops_s": hs,
             "pmarine": pmarine_rows,
+            "pmarine_cells": pmarine_cells,
             "cells": cells,
             "fast_cells": fast_cells,
             "fast_buffer": fast_buffer,

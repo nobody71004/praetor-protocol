@@ -12,11 +12,17 @@
 //!
 //! This is a profile/composition, not a new primitive. It has not been audited.
 
+use std::collections::{HashSet, VecDeque};
+
 use aegis::aegis256::Aegis256;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::error::{Error, Result};
-use crate::util::{ct_eq, hkdf_sha256, hmac_sha256, u64be};
+use crate::util::{ct_eq, hkdf_sha256, hmac_sha256, random_array, u16be, u64be};
+use crate::wire::{
+    pack_cell_into_zero, unpack_cell_view, Assembler, Cell, Received, ReceivedRef,
+    CELL_HEADER_BYTES, CELL_PAD, MAX_CELL_SIZE,
+};
 
 pub const NONCE_BYTES: usize = 16;
 pub const SIV_BYTES: usize = 32;
@@ -24,12 +30,17 @@ pub const TAG_BYTES: usize = 32;
 pub const OVERHEAD: usize = NONCE_BYTES + SIV_BYTES + TAG_BYTES;
 pub const DETERMINISTIC_OVERHEAD: usize = SIV_BYTES + TAG_BYTES;
 
+/// Per-cell wire overhead of the fixed-cell channel: the probabilistic
+/// envelope's nonce, SIV and AEGIS-256 tag.
+pub const CELL_OVERHEAD: usize = OVERHEAD;
+
 /// AEGIS-256 limits plaintext and associated data to 2^61 - 1 bytes.
 const MAX_BYTES: u64 = (1 << 61) - 1;
 const LABEL_SALT: &[u8] = b"PRAETOR/1";
 const LABEL_INFO: &[u8] = b"pmarine";
 const LABEL_SIV: &[u8] = b"PMARINE/1/siv";
 const LABEL_AEAD: &[u8] = b"PMARINE/1/aead";
+const LABEL_CHANNEL: &[u8] = b"PRAETOR/PMARINE/1";
 
 #[derive(Clone, Zeroize, ZeroizeOnDrop)]
 pub struct PmarineKey {
@@ -124,6 +135,216 @@ impl PmarineKey {
             return Err(Error::Auth);
         }
         Ok(pt)
+    }
+}
+
+/// Bounded replay window over monotonically increasing 64-bit cell counters.
+struct CounterWindow {
+    capacity: usize,
+    seen: HashSet<u64>,
+    order: VecDeque<u64>,
+}
+
+impl CounterWindow {
+    fn new(capacity: usize) -> Self {
+        Self { capacity, seen: HashSet::new(), order: VecDeque::new() }
+    }
+
+    fn accept(&mut self, counter: u64) -> Result<()> {
+        if !self.seen.insert(counter) {
+            return Err(Error::Replay);
+        }
+        self.order.push_back(counter);
+        while self.order.len() > self.capacity {
+            if let Some(old) = self.order.pop_front() {
+                self.seen.remove(&old);
+            }
+        }
+        Ok(())
+    }
+}
+
+/// A full-duplex fixed-cell channel using the PMARINE envelope per cell.
+///
+/// Each cell is `nonce || siv || AEGIS-256(cell) || tag`, where the 16-byte
+/// nonce is an 8-byte per-channel prefix plus a 64-bit counter. The counter
+/// both makes every AEGIS nonce distinct and drives the replay window. The
+/// cell's AAD binds the profile label and the fixed cell size, so cells from a
+/// channel with a different geometry do not authenticate.
+pub struct PmarineChannel {
+    cell_size: usize,
+    payload_capacity: usize,
+    send_key: PmarineKey,
+    recv_key: PmarineKey,
+    send_prefix: [u8; 8],
+    send_counter: u64,
+    next_msg_id: u64,
+    replay: CounterWindow,
+    assembler: Assembler,
+    aad: Vec<u8>,
+    aead_aad: Vec<u8>,
+}
+
+impl PmarineChannel {
+    pub fn new(
+        send_key: [u8; 32],
+        recv_key: [u8; 32],
+        cell_size: usize,
+        max_message_bytes: usize,
+    ) -> Result<Self> {
+        if cell_size < CELL_HEADER_BYTES + 1 || cell_size > MAX_CELL_SIZE {
+            return Err(Error::Range);
+        }
+        let mut aad = Vec::with_capacity(LABEL_CHANNEL.len() + 2);
+        aad.extend_from_slice(LABEL_CHANNEL);
+        aad.extend_from_slice(&u16be(cell_size as u16));
+        let mut aead_aad = Vec::with_capacity(LABEL_AEAD.len() + aad.len());
+        aead_aad.extend_from_slice(LABEL_AEAD);
+        aead_aad.extend_from_slice(&aad);
+        Ok(Self {
+            cell_size,
+            payload_capacity: cell_size - CELL_HEADER_BYTES,
+            send_key: PmarineKey::new(&send_key)?,
+            recv_key: PmarineKey::new(&recv_key)?,
+            send_prefix: random_array::<8>(),
+            send_counter: 0,
+            next_msg_id: u64::from_be_bytes(random_array::<8>()),
+            replay: CounterWindow::new(4096),
+            assembler: Assembler::new(max_message_bytes, 1 << 16),
+            aad,
+            aead_aad,
+        })
+    }
+
+    fn seal_cell_into(&mut self, cell: &Cell, out: &mut Vec<u8>) -> Result<()> {
+        let base = out.len();
+        out.resize(base + CELL_OVERHEAD + self.cell_size, 0);
+        let mut nonce = [0u8; NONCE_BYTES];
+        nonce[..8].copy_from_slice(&self.send_prefix);
+        nonce[8..].copy_from_slice(&self.send_counter.to_be_bytes());
+        out[base..base + NONCE_BYTES].copy_from_slice(&nonce);
+
+        let siv_at = base + NONCE_BYTES;
+        let body_at = siv_at + SIV_BYTES;
+        let body_end = body_at + self.cell_size;
+        let siv = {
+            let body = &mut out[body_at..body_end];
+            pack_cell_into_zero(cell, self.cell_size, body)?;
+            self.send_key.siv(&nonce, &self.aad, body)
+        };
+        out[siv_at..body_at].copy_from_slice(&siv);
+        let tag = {
+            let body = &mut out[body_at..body_end];
+            Aegis256::<TAG_BYTES>::new(&self.send_key.k_enc, &siv)
+                .encrypt_in_place(body, &self.aead_aad)
+        };
+        out[body_end..body_end + TAG_BYTES].copy_from_slice(&tag);
+        self.send_counter = self.send_counter.checked_add(1).ok_or(Error::Range)?;
+        Ok(())
+    }
+
+    /// Fragment and seal one message into a caller-owned buffer.
+    ///
+    /// This is the zero-allocation path: `out` only grows to its high-water
+    /// mark, so a tunnel can reuse one buffer for every packet.
+    pub fn send_into(&mut self, data: &[u8], out: &mut Vec<u8>) -> Result<()> {
+        let count = ((data.len() + self.payload_capacity - 1) / self.payload_capacity).max(1);
+        if count > u16::MAX as usize {
+            return Err(Error::Policy);
+        }
+        let msg_id = self.next_msg_id;
+        self.next_msg_id = self.next_msg_id.wrapping_add(1);
+        for i in 0..count {
+            let from = i * self.payload_capacity;
+            let to = (from + self.payload_capacity).min(data.len());
+            let cell = Cell::data(msg_id, i as u16, count as u16, &data[from..to]);
+            self.seal_cell_into(&cell, out)?;
+        }
+        Ok(())
+    }
+
+    /// Convenience wrapper: one allocation per message, then one per cell.
+    pub fn send(&mut self, data: &[u8]) -> Result<Vec<Vec<u8>>> {
+        let mut flat = Vec::new();
+        self.send_into(data, &mut flat)?;
+        let cell_len = CELL_OVERHEAD + self.cell_size;
+        Ok(flat.chunks(cell_len).map(|c| c.to_vec()).collect())
+    }
+
+    pub fn send_padding(&mut self) -> Result<Vec<u8>> {
+        let msg_id = self.next_msg_id;
+        self.next_msg_id = self.next_msg_id.wrapping_add(1);
+        let mut out = Vec::with_capacity(CELL_OVERHEAD + self.cell_size);
+        self.seal_cell_into(&Cell::padding(msg_id), &mut out)?;
+        Ok(out)
+    }
+
+    /// Authenticate, decrypt and decode one wire cell, borrowing the payload
+    /// in place. The AEGIS tag is checked first; the SIV is then re-derived
+    /// from the recovered plaintext as the independent commitment.
+    pub fn receive_ref<'a>(&mut self, wire: &'a mut [u8]) -> Result<ReceivedRef<'a>> {
+        if wire.len() != CELL_OVERHEAD + self.cell_size {
+            return Err(Error::Truncated);
+        }
+        let mut nonce = [0u8; NONCE_BYTES];
+        nonce.copy_from_slice(&wire[..NONCE_BYTES]);
+        let mut counter_bytes = [0u8; 8];
+        counter_bytes.copy_from_slice(&nonce[8..]);
+        let counter = u64::from_be_bytes(counter_bytes);
+
+        let siv_at = NONCE_BYTES;
+        let body_at = siv_at + SIV_BYTES;
+        let body_end = body_at + self.cell_size;
+        let mut siv = [0u8; SIV_BYTES];
+        siv.copy_from_slice(&wire[siv_at..body_at]);
+        let mut tag = [0u8; TAG_BYTES];
+        tag.copy_from_slice(&wire[body_end..]);
+
+        if Aegis256::<TAG_BYTES>::new(&self.recv_key.k_enc, &siv)
+            .decrypt_in_place(&mut wire[body_at..body_end], &tag, &self.aead_aad)
+            .is_err()
+        {
+            wire.fill(0);
+            return Err(Error::Auth);
+        }
+        let expected = self.recv_key.siv(&nonce, &self.aad, &wire[body_at..body_end]);
+        if !ct_eq(&siv, &expected) {
+            wire.fill(0);
+            return Err(Error::Auth);
+        }
+
+        let view = unpack_cell_view(&wire[body_at..body_end], self.cell_size)?;
+        self.replay.accept(counter)?;
+        if view.kind == CELL_PAD {
+            return Ok(ReceivedRef::Padding);
+        }
+        if view.frag_count == 1 {
+            return Ok(ReceivedRef::Complete { msg_id: view.msg_id, data: view.payload });
+        }
+        let cell = Cell {
+            kind: view.kind,
+            flags: view.flags,
+            frag_index: view.frag_index,
+            frag_count: view.frag_count,
+            msg_id: view.msg_id,
+            payload: view.payload.to_vec(),
+        };
+        match self.assembler.push(&cell)? {
+            None => Ok(ReceivedRef::Fragment { kind: view.kind, msg_id: view.msg_id }),
+            Some((msg_id, data)) => Ok(ReceivedRef::Assembled { msg_id, data }),
+        }
+    }
+
+    /// Authenticate and decode one wire cell into an owned payload.
+    pub fn receive(&mut self, wire: &mut [u8]) -> Result<Received> {
+        match self.receive_ref(wire)? {
+            ReceivedRef::Padding => Ok(Received::Padding),
+            ReceivedRef::Fragment { kind, msg_id } => Ok(Received::Fragment { kind, msg_id }),
+            ReceivedRef::Complete { msg_id, data } => {
+                Ok(Received::Complete { msg_id, data: data.to_vec() })
+            }
+            ReceivedRef::Assembled { msg_id, data } => Ok(Received::Complete { msg_id, data }),
+        }
     }
 }
 

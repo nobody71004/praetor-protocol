@@ -1,0 +1,12 @@
+node_modules/
+dist/
+mcp-dist/
+release/
+build/*.png
+.vite-dev.log
+.vite-dev.pid
+.mcp-audit.jsonl
+.mcp-pipeline-output.json
+.mcp-pipeline-stderr.log
+*.log
+.DS_Store

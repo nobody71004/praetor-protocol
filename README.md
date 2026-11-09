@@ -9,7 +9,9 @@ establishment, forward secrecy, and a capability layer designed to survive a
 rogue AI agent or a coordinated botnet. PSEAL is new at the construction level;
 it composes standard, analysed primitives rather than inventing a block cipher
 or permutation. The experimental **PMARINE** profile is a PSEAL/2 variant built
-on AEGIS-256; it is a profile, not a new primitive.
+on AEGIS-256; it is a profile, not a new primitive. The Rust crate includes a
+fixed-cell `PmarineChannel`; the JavaScript reference and desktop client still
+negotiate PSEAL.
 
 > **Status: reference implementation, not externally audited.**
 > "Military-grade" is a procurement claim, not a security property. See
@@ -44,7 +46,7 @@ cryptanalysis. Do not treat novelty as a proof of strength.
 | Layer | Status |
 |---|---|
 | **PSEAL/1** | New AEAD construction: SIV prefix + ChaCha20-Poly1305 + independent commitment tag |
-| **PRAETOR/PMARINE** | Experimental PSEAL/2 profile: SIV + AEGIS-256, not a new primitive |
+| **PRAETOR/PMARINE** | Experimental PSEAL/2 envelope plus a Rust fixed-cell channel: SIV + AEGIS-256, not a new primitive |
 | **PRAETOR/WIRE** | Fixed-cell framing with trial decryption over a bounded epoch window |
 | **PRAETOR-HS/1** | Hybrid X25519 + ML-KEM-768 handshake with two-sided confirmation |
 | **PRAETOR/GUARD** | Capability, quota, audit, custody and admission enforcement |
@@ -86,10 +88,26 @@ Rust implementation:
 
 ```bash
 cd praetor-rs
-./cargo.sh test           # 34 tests, byte-compatible with the JS vectors
+./cargo.sh test           # 41 tests, byte-compatible with the JS vectors
 ./cargo.sh run --release -- selftest
 ./cargo.sh run --release -- bench
 ```
+
+Desktop control plane:
+
+```bash
+cd desktop
+npm install
+npm start                 # Electron + Vite development app
+npm run dist              # portable EXE in desktop/release/
+```
+
+The desktop app seeds **Nexus PSEAL**, **Nexus FAST**, **Nexus BOLT** and
+**Nexus PMARINE** profiles. All four currently connect through the PSEAL
+transport to the Dallas egress; FAST, BOLT and PMARINE are routing presets until
+their separate channels are negotiated by the client. See
+[`desktop/README.md`](desktop/README.md) for the proxy lifecycle and server
+deployment notes.
 
 ## Architecture
 
@@ -151,12 +169,13 @@ FAST and BOLT are weaker than PSEAL by design; see
 [`docs/FAST.md`](praetor/docs/FAST.md) and
 [`docs/BOLT.md`](praetor/docs/BOLT.md).
 
-**PRAETOR/PMARINE** is the experimental PSEAL/2 envelope: it keeps PSEAL's
-SIV and 80-byte overhead but replaces the inner AEAD and separate commitment
-tag with AEGIS-256 (RFC 10032), a 32-byte SIV used as the AEGIS nonce and
-re-derived after decryption. It is Rust-only, is not a transport profile yet,
-and is not the default; it measured 1.15 GiB/s sealing at 1 MiB versus PSEAL's
-499 MiB/s. See [`docs/PMARINE.md`](praetor/docs/PMARINE.md).
+**PRAETOR/PMARINE** is the experimental PSEAL/2 envelope and fixed-cell channel:
+it keeps PSEAL's SIV and 80-byte overhead but replaces the inner AEAD and
+separate commitment tag with AEGIS-256 (RFC 10032), a 32-byte SIV used as the
+AEGIS nonce and re-derived after decryption. It is Rust-only, not the default,
+and not yet negotiated by the JavaScript or desktop transports; it measured
+1.15 GiB/s sealing at 1 MiB versus PSEAL's 499 MiB/s. See
+[`docs/PMARINE.md`](praetor/docs/PMARINE.md).
 
 ![PRAETOR/1 vs WireGuard](praetor/docs/benchmarks-praetor-vs-wireguard.svg)
 

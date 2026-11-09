@@ -2,8 +2,8 @@
 
 Byte-compatible with the JavaScript reference in `../praetor`. The crate contains
 PSEAL/1, PRAETOR/WIRE, PRAETOR/FAST, PRAETOR/BOLT, PRAETOR/PMARINE (experimental
-PSEAL/2 on AEGIS-256), PRAETOR-HS/1 (X25519 + ML-KEM-768), PRAETOR/CONTAINER and
-the PRAETOR/GUARD capability layer.
+PSEAL/2 envelope and fixed-cell channel on AEGIS-256), PRAETOR-HS/1 (X25519 +
+ML-KEM-768), PRAETOR/CONTAINER and the PRAETOR/GUARD capability layer.
 
 ## Toolchain
 
@@ -53,12 +53,12 @@ truncates padding automatically.
   container roundtrip/truncation, policy binding, lockout, audit-chain edit
   detection, Shamir and PoW.
 
-Current status: `34 passed` (9 roundtrip + 5 vectors + 4 fast + 6 bolt + 10
+Current status: `41 passed` (9 roundtrip + 5 vectors + 4 fast + 6 bolt + 17
 pmarine), release build. The roundtrip tests include atomic file decryption and single-use
 admission tickets: a truncated container must not clobber the destination or
-leave partial plaintext. The fast and bolt tests cover fragmentation, both
-calling conventions, tamper rejection, replay rejection, padding cells and key
-separation.
+leave partial plaintext. The fast, bolt and pmarine tests cover fragmentation,
+both calling conventions, tamper rejection, replay rejection, padding cells,
+key separation and cell-geometry binding.
 
 ## Performance
 
@@ -83,8 +83,10 @@ Measured on the development machine (Windows x64, release):
 
 BOLT uses AEGIS-128L through the `aegis` crate; FAST uses `ring`'s
 AES-256-GCM. PMARINE uses the same crate's AEGIS-256 with a 32-byte SIV and a
-32-byte tag; it is an envelope profile, not a fixed-cell transport. In the same
-session BOLT beats userspace WireGuard by 3.98× on 1 KiB roundtrips and 4.47×
+32-byte tag. `PmarineChannel` seals each fixed-size wire cell with a per-cell
+nonce, counter and replay window; the JavaScript reference and desktop client
+still negotiate PSEAL. In the same session BOLT beats userspace WireGuard by
+3.98× on 1 KiB roundtrips and 4.47×
 on 60 KB throughput, and beats FAST by 1.20× and 1.34×. The ML-KEM-768 handshake is now 0.86× (up from 0.60×) after switching
 to libcrux's AVX2 implementation and reusing cached X25519 public keys in
 decapsulation; X25519 DH is what remains. See
@@ -110,7 +112,8 @@ decapsulation; X25519 DH is what remains. See
   authenticated decryption as the independent commitment. AEGIS's built-in
   commitment is not full when an attacker controls the associated data
   (IACR 2023/1495; RFC 10032 §9.1.2), so PMARINE does not rely on it alone.
-  It is Rust-only and not audited; the JS reference does not implement it.
+  It is Rust-only and not audited; the JS reference does not implement it, and
+  the desktop PMARINE profile currently routes over PSEAL.
 * All-zero X25519 public keys and shared secrets are rejected.
 * This is a reference implementation, not independently audited, and not a
   FIPS 140-3 validated module. Treat "military-grade" as a procurement claim,

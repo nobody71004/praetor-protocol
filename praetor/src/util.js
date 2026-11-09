@@ -13,6 +13,23 @@ import {
   timingSafeEqual,
   scryptSync,
 } from 'node:crypto';
+import { sha3_256 as nobleSha3_256 } from '@noble/hashes/sha3.js';
+import { chacha20poly1305 } from '@noble/ciphers/chacha.js';
+
+// Electron's BoringSSL build omits ChaCha20-Poly1305 from node:crypto even
+// though standard Node exposes it. Detect once and use the pure-JS AEAD when
+// the native cipher is unavailable.
+const nativeChaCha = (() => {
+  try {
+    const probe = createCipheriv('chacha20-poly1305', Buffer.alloc(32), Buffer.alloc(12), {
+      authTagLength: 16,
+    });
+    probe.final();
+    return true;
+  } catch {
+    return false;
+  }
+})();
 
 export class PraetorError extends Error {
   /**
@@ -119,9 +136,12 @@ export function sha256(...parts) {
 }
 
 export function sha3_256(...parts) {
-  const h = createHash('sha3-256');
+  // Electron's BoringSSL build does not expose SHA3 through node:crypto.
+  // @noble/hashes is already part of the PRAETOR dependency graph and gives
+  // byte-identical SHA3-256 on Node, Electron, and the browser.
+  const h = nobleSha3_256.create();
   for (const p of parts) h.update(toBytes(p));
-  return h.digest();
+  return Buffer.from(h.digest());
 }
 
 export function hmacSha256(key, ...parts) {
@@ -137,10 +157,13 @@ export function hkdfSha256(ikm, salt, info, length) {
 /** ChaCha20-Poly1305 (IETF, 96-bit nonce, 128-bit tag). Returns ct || tag. */
 export function chachaSeal(key, nonce, plaintext, aad = EMPTY) {
   const pt = toBytes(plaintext);
+  const ad = toBytes(aad);
+  if (!nativeChaCha) {
+    return Buffer.from(chacha20poly1305(toBytes(key), toBytes(nonce), ad).encrypt(pt));
+  }
   const cipher = createCipheriv('chacha20-poly1305', toBytes(key), toBytes(nonce), {
     authTagLength: 16,
   });
-  const ad = toBytes(aad);
   if (ad.length > 0) cipher.setAAD(ad, { plaintextLength: pt.length });
   const body = Buffer.concat([cipher.update(pt), cipher.final()]);
   return Buffer.concat([body, cipher.getAuthTag()]);
@@ -149,13 +172,21 @@ export function chachaSeal(key, nonce, plaintext, aad = EMPTY) {
 export function chachaOpen(key, nonce, sealed, aad = EMPTY) {
   const input = toBytes(sealed);
   if (input.length < 16) fail(ERR.TRUNCATED, 'AEAD ciphertext shorter than tag');
+  const ad = toBytes(aad);
+  if (!nativeChaCha) {
+    try {
+      return Buffer.from(chacha20poly1305(toBytes(key), toBytes(nonce), ad).decrypt(input));
+    } catch (cause) {
+      // Never distinguish padding failure from tag failure to the caller.
+      throw new PraetorError(ERR.AUTH, 'authentication failed', cause);
+    }
+  }
   const body = input.subarray(0, input.length - 16);
   const tag = input.subarray(input.length - 16);
   const decipher = createDecipheriv('chacha20-poly1305', toBytes(key), toBytes(nonce), {
     authTagLength: 16,
   });
   decipher.setAuthTag(tag);
-  const ad = toBytes(aad);
   if (ad.length > 0) decipher.setAAD(ad, { plaintextLength: body.length });
   try {
     return Buffer.concat([decipher.update(body), decipher.final()]);

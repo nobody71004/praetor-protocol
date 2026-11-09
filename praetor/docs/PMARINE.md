@@ -5,9 +5,10 @@ PSEAL's SIV construction and 80-byte envelope shape, but replaces
 ChaCha20-Poly1305 plus the separate commitment HMAC with **AEGIS-256**
 (RFC 10032) and a full 256-bit SIV.
 
-It is **not** the default, **not** a transport profile yet, **not** implemented
-in the JavaScript reference, and **not independently audited**. It is a
-composition of standard primitives, not a new block cipher or permutation.
+It is **not** the default, **not** implemented in the JavaScript reference, and
+**not independently audited**. The Rust crate now includes a fixed-cell
+`PmarineChannel`; the JavaScript and desktop transports still use PSEAL. PMARINE
+is a composition of standard primitives, not a new block cipher or permutation.
 
 ## Why this profile exists
 
@@ -47,6 +48,25 @@ ct || tag = AEGIS-256(k_enc, nonce = siv, pt,
 
 envelope = nonce || siv || ct || tag
 ```
+
+## Fixed-cell channel
+
+`PmarineChannel` wraps each `PRAETOR/WIRE` cell in the envelope above:
+
+```
+nonce = 8-byte random channel prefix || 64-bit big-endian counter
+siv   = HMAC-SHA256(k_siv, "PMARINE/1/siv" || nonce || ... || cell)
+cell  = nonce || siv || AEGIS-256(k_enc, siv, cell, aad) || tag
+```
+
+The associated data binds the `PRAETOR/PMARINE/1` label and the negotiated cell
+size, so a cell from a different geometry does not authenticate. The receiver
+checks the AEGIS tag, re-derives the SIV from the recovered plaintext, then
+admits the counter through a 4,096-entry replay window. `send_into` reuses a
+caller-owned buffer and `receive_ref` borrows plaintext from the decrypted cell;
+the owned `send`/`receive` helpers are convenience wrappers. The channel is
+implemented and tested in Rust only; it is not wired into the JS reference or
+the desktop client.
 
 Overhead is **80 bytes** probabilistic and **64 bytes** deterministic, the same
 as PSEAL/1. The difference is internal: PSEAL carries a 16-byte SIV prefix, a
@@ -125,9 +145,11 @@ without returning plaintext.
   Reusing the same `(pt, aad, nonce)` produces the same envelope by design.
 * **AES acceleration matters.** libaegis falls back to software AES without
   AES-NI/ARM crypto; PMARINE can then be slower than PSEAL.
-* **Rust-only.** The JS reference and browser bundle do not implement PMARINE.
-* **No fixed-cell channel yet.** This release exposes the envelope primitive;
-  `SecureChannel` still uses PSEAL/1.
+* **Rust-only channel.** The JS reference, browser bundle and desktop client do
+  not implement PMARINE. The desktop PMARINE profile is a routing preset over
+  PSEAL, not a PMARINE session.
+* **Fixed-cell channel is Rust-only.** `PmarineChannel` exists and is tested in
+  the Rust crate; `SecureChannel` in the JS reference still uses PSEAL/1.
 
 ## Measured performance
 
@@ -159,8 +181,9 @@ cd praetor-rs
 ./cargo.sh run --release -- selftest
 ```
 
-`protocol-bench` prints a `pmarine` array with `seal_mib_s`, `open_mib_s` and
-`roundtrip_mib_s` for 64 B, 1 KiB, 60 KB and 1 MiB.
+`protocol-bench` prints a `pmarine` envelope array with `seal_mib_s`,
+`open_mib_s` and `roundtrip_mib_s`, plus a `pmarine_cells` array for the
+fixed-cell channel at 1 KiB and 60 KB.
 
 ## References
 

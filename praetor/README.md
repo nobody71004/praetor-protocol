@@ -85,7 +85,7 @@ Rust implementation:
 
 ```bash
 cd praetor-rs
-./cargo.sh test           # 34 tests, byte-compatible with the JS vectors
+./cargo.sh test           # 41 tests, byte-compatible with the JS vectors
 ./cargo.sh run --release -- selftest
 ./cargo.sh run --release -- bench
 ```
@@ -149,12 +149,13 @@ backend, X25519 DH dominates the remaining cost.
 FAST and BOLT are weaker than PSEAL by design; see
 [`docs/FAST.md`](docs/FAST.md) and [`docs/BOLT.md`](docs/BOLT.md).
 
-**PRAETOR/PMARINE** is the experimental PSEAL/2 envelope: it keeps PSEAL's
-SIV and 80-byte overhead but replaces the inner AEAD and separate commitment
-tag with AEGIS-256 (RFC 10032), a 32-byte SIV used as the AEGIS nonce and
-re-derived after decryption. It is Rust-only, is not a transport profile yet,
-and is not the default; it measured 1.15 GiB/s sealing at 1 MiB versus PSEAL's
-499 MiB/s. See [`docs/PMARINE.md`](docs/PMARINE.md).
+**PRAETOR/PMARINE** is the experimental PSEAL/2 envelope and fixed-cell channel:
+it keeps PSEAL's SIV and 80-byte overhead but replaces the inner AEAD and
+separate commitment tag with AEGIS-256 (RFC 10032), a 32-byte SIV used as the
+AEGIS nonce and re-derived after decryption. It is Rust-only, not the default,
+and not yet negotiated by the JavaScript or desktop transports; it measured
+1.15 GiB/s sealing at 1 MiB versus PSEAL's 499 MiB/s. See
+[`docs/PMARINE.md`](docs/PMARINE.md).
 
 ![PRAETOR/1 vs WireGuard](docs/benchmarks-praetor-vs-wireguard.svg)
 
