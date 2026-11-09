@@ -23,8 +23,8 @@ use ring::aead::{Aad, LessSafeKey, Nonce, UnboundKey, AES_256_GCM};
 use crate::error::{Error, Result};
 use crate::util::{random_array, u16be};
 use crate::wire::{
-    pack_cell_into_zero, unpack_cell, Assembler, Cell, Received, CELL_HEADER_BYTES, CELL_PAD,
-    MAX_CELL_SIZE,
+    pack_cell_into_zero, unpack_cell_view, Assembler, Cell, Received, ReceivedRef,
+    CELL_HEADER_BYTES, CELL_PAD, MAX_CELL_SIZE,
 };
 
 /// AES-256-GCM fixed nonce and tag sizes (ring `NONCE_LEN` / `TAG_LEN`).
@@ -104,25 +104,32 @@ impl FastChannel {
         })
     }
 
-    fn seal(&mut self, cell: &Cell) -> Result<Vec<u8>> {
-        let mut wire = vec![0u8; FAST_OVERHEAD + self.cell_size];
+    fn seal_cell_into(&mut self, cell: &Cell, out: &mut Vec<u8>) -> Result<()> {
+        let base = out.len();
+        out.resize(base + FAST_OVERHEAD + self.cell_size, 0);
         let mut nonce = [0u8; FAST_NONCE_BYTES];
         nonce[..8].copy_from_slice(&self.send_nonce_prefix);
         nonce[8..].copy_from_slice(&self.send_counter.to_be_bytes());
-        let body = FAST_NONCE_BYTES..FAST_NONCE_BYTES + self.cell_size;
-        pack_cell_into_zero(cell, self.cell_size, &mut wire[body.clone()])?;
+        let body = base + FAST_NONCE_BYTES..base + FAST_NONCE_BYTES + self.cell_size;
+        pack_cell_into_zero(cell, self.cell_size, &mut out[body.clone()])?;
         let tag = self
             .send
             .seal_in_place_separate_tag(
                 Nonce::assume_unique_for_key(nonce),
                 Aad::from(self.aad.as_slice()),
-                &mut wire[body.clone()],
+                &mut out[body.clone()],
             )
             .map_err(|_| Error::Auth)?;
-        wire[..FAST_NONCE_BYTES].copy_from_slice(&nonce);
-        wire[body.end..].copy_from_slice(tag.as_ref());
+        out[base..base + FAST_NONCE_BYTES].copy_from_slice(&nonce);
+        out[body.end..].copy_from_slice(tag.as_ref());
         self.send_counter = self.send_counter.checked_add(1).ok_or(Error::Range)?;
-        Ok(wire)
+        Ok(())
+    }
+
+    fn seal(&mut self, cell: &Cell) -> Result<Vec<u8>> {
+        let mut out = Vec::with_capacity(FAST_OVERHEAD + self.cell_size);
+        self.seal_cell_into(cell, &mut out)?;
+        Ok(out)
     }
 
     /// Fragment and seal one application message.
@@ -143,15 +150,33 @@ impl FastChannel {
         Ok(out)
     }
 
+    /// Fragment and seal one message into a caller-owned buffer.
+    pub fn send_into(&mut self, data: &[u8], out: &mut Vec<u8>) -> Result<()> {
+        let count = ((data.len() + self.payload_capacity - 1) / self.payload_capacity).max(1);
+        if count > u16::MAX as usize {
+            return Err(Error::Policy);
+        }
+        let msg_id = self.next_msg_id;
+        self.next_msg_id = self.next_msg_id.wrapping_add(1);
+        for i in 0..count {
+            let from = i * self.payload_capacity;
+            let to = (from + self.payload_capacity).min(data.len());
+            let cell = Cell::data(msg_id, i as u16, count as u16, &data[from..to]);
+            self.seal_cell_into(&cell, out)?;
+        }
+        Ok(())
+    }
+
     pub fn send_padding(&mut self) -> Result<Vec<u8>> {
         let msg_id = self.next_msg_id;
         self.next_msg_id = self.next_msg_id.wrapping_add(1);
         self.seal(&Cell::padding(msg_id))
     }
 
-    /// Authenticate and decode one wire cell in place. Every cell has its own counter.
-    pub fn receive(&mut self, wire: &mut [u8]) -> Result<Received> {
-        if wire.len() < FAST_OVERHEAD + CELL_HEADER_BYTES + 1 {
+    /// Authenticate and decode one wire cell, borrowing the payload in place.
+    /// Every cell has its own counter.
+    pub fn receive_ref<'a>(&mut self, wire: &'a mut [u8]) -> Result<ReceivedRef<'a>> {
+        if wire.len() != FAST_OVERHEAD + self.cell_size {
             return Err(Error::Truncated);
         }
         let mut nonce = [0u8; FAST_NONCE_BYTES];
@@ -159,33 +184,51 @@ impl FastChannel {
         let mut counter_bytes = [0u8; 4];
         counter_bytes.copy_from_slice(&nonce[8..]);
         let counter = u32::from_be_bytes(counter_bytes);
-        if wire.len() != FAST_OVERHEAD + self.cell_size {
-            return Err(Error::Truncated);
+        // ring authenticates and decrypts the cell in place. The nonce prefix
+        // is excluded because ring writes plaintext at the start of its buffer.
+        {
+            self.recv
+                .open_in_place(
+                    Nonce::assume_unique_for_key(nonce),
+                    Aad::from(self.aad.as_slice()),
+                    &mut wire[FAST_NONCE_BYTES..],
+                )
+                .map_err(|_| Error::Auth)?;
         }
-        // ring authenticates and decrypts the cell in place, so there is no
-        // plaintext copy on the receive path. The nonce prefix is excluded
-        // because ring writes recovered plaintext at the start of its buffer.
-        self.recv
-            .open_in_place(
-                Nonce::assume_unique_for_key(nonce),
-                Aad::from(self.aad.as_slice()),
-                &mut wire[FAST_NONCE_BYTES..],
-            )
-            .map_err(|_| Error::Auth)?;
-        let cell = unpack_cell(
+        let view = unpack_cell_view(
             &wire[FAST_NONCE_BYTES..FAST_NONCE_BYTES + self.cell_size],
             self.cell_size,
         )?;
         self.replay.accept(counter)?;
-        if cell.kind == CELL_PAD {
-            return Ok(Received::Padding);
+        if view.kind == CELL_PAD {
+            return Ok(ReceivedRef::Padding);
         }
-        if cell.frag_count == 1 {
-            return Ok(Received::Complete { msg_id: cell.msg_id, data: cell.payload });
+        if view.frag_count == 1 {
+            return Ok(ReceivedRef::Complete { msg_id: view.msg_id, data: view.payload });
         }
+        let cell = Cell {
+            kind: view.kind,
+            flags: view.flags,
+            frag_index: view.frag_index,
+            frag_count: view.frag_count,
+            msg_id: view.msg_id,
+            payload: view.payload.to_vec(),
+        };
         match self.assembler.push(&cell)? {
-            None => Ok(Received::Fragment { kind: cell.kind, msg_id: cell.msg_id }),
-            Some((msg_id, data)) => Ok(Received::Complete { msg_id, data }),
+            None => Ok(ReceivedRef::Fragment { kind: view.kind, msg_id: view.msg_id }),
+            Some((msg_id, data)) => Ok(ReceivedRef::Assembled { msg_id, data }),
+        }
+    }
+
+    /// Authenticate and decode one wire cell into an owned payload.
+    pub fn receive(&mut self, wire: &mut [u8]) -> Result<Received> {
+        match self.receive_ref(wire)? {
+            ReceivedRef::Padding => Ok(Received::Padding),
+            ReceivedRef::Fragment { kind, msg_id } => Ok(Received::Fragment { kind, msg_id }),
+            ReceivedRef::Complete { msg_id, data } => {
+                Ok(Received::Complete { msg_id, data: data.to_vec() })
+            }
+            ReceivedRef::Assembled { msg_id, data } => Ok(Received::Complete { msg_id, data }),
         }
     }
 }

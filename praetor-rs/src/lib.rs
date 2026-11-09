@@ -4,6 +4,7 @@
 //! `../vectors/praetor-vectors.json`.
 
 pub mod aead;
+pub mod bolt;
 pub mod container;
 pub mod error;
 pub mod fast;

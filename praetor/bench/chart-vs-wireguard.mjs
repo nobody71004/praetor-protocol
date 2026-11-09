@@ -8,14 +8,19 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const praetor = JSON.parse(readFileSync(path.join(here, 'results-praetor.json'), 'utf8'));
 const wg = JSON.parse(readFileSync(path.join(here, 'results-wireguard.json'), 'utf8'));
 
+// The zero-copy buffer paths are the fair comparison to boringtun, which also
+// writes into a caller buffer and hands back a slice.
+const fastRows = praetor.fast_buffer ?? praetor.fast_cells;
 const praetor1k = praetor.cells.find((r) => r.size === 1008);
 const praetor60 = praetor.cells.find((r) => r.size === 60000);
-const fast1k = praetor.fast_cells.find((r) => r.size === 1008);
-const fast60 = praetor.fast_cells.find((r) => r.size === 60000);
+const fast1k = fastRows.find((r) => r.size === 1008);
+const fast60 = fastRows.find((r) => r.size === 60000);
+const bolt1k = praetor.bolt_cells.find((r) => r.size === 1008 && r.mode === 'zero_copy');
+const bolt60 = praetor.bolt_cells.find((r) => r.size === 60000 && r.mode === 'zero_copy');
 const wg1k = wg.transport.find((r) => r.size === 1024);
 const wg60 = wg.transport.find((r) => r.size === 60000);
 
-if (!praetor1k || !praetor60 || !fast1k || !fast60 || !wg1k || !wg60) {
+if (!praetor1k || !praetor60 || !fast1k || !fast60 || !bolt1k || !bolt60 || !wg1k || !wg60) {
   throw new Error('benchmark rows missing');
 }
 
@@ -29,6 +34,7 @@ const LEFT = 250;
 const TRACK = 660;
 const MINT = '#5ce1b0';
 const AMBER = '#ffc46b';
+const VIOLET = '#c9a2ff';
 const BLUE = '#6aa9ff';
 const INK = '#e7f2ea';
 const MUTED = '#8fa6a1';
@@ -58,37 +64,41 @@ function panel(y, title, note, rows, format, unit) {
 
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-labelledby="title desc" font-family="Segoe UI, Arial, sans-serif">
   <title id="title">PRAETOR/1 profiles versus WireGuard on the same CPU</title>
-  <desc id="desc">Grouped bar chart of handshakes per second, 1 KiB authenticated roundtrips per second, and 60 KB full-path throughput. PSEAL is the strong default; FAST is an opt-in AES-GCM performance profile that is faster than userspace WireGuard on transport but not on handshakes. WireGuard is boringtun userspace.</desc>
+  <desc id="desc">Grouped bar chart of handshakes per second, 1 KiB authenticated roundtrips per second, and 60 KB full-path throughput. PSEAL is the strong default, FAST is AES-256-GCM, BOLT is AEGIS-128L. All transport rows use the same zero-copy buffer API. WireGuard is boringtun userspace.</desc>
   <rect width="${W}" height="${H}" fill="#0b0f12"/>
   <text x="56" y="62" fill="${INK}" font-size="30" font-weight="800" letter-spacing="-0.5">PRAETOR/1 profiles vs WireGuard</text>
   <text x="56" y="92" fill="${MUTED}" font-size="14">Same machine · single thread · Rust release builds · higher is better</text>
   <g font-family="Segoe UI, Arial, sans-serif">
-    <rect x="${W - 322}" y="46" width="14" height="14" rx="3" fill="${MINT}"/>
-    <text x="${W - 300}" y="58" fill="${INK}" font-size="13">PSEAL</text>
-    <rect x="${W - 230}" y="46" width="14" height="14" rx="3" fill="${AMBER}"/>
-    <text x="${W - 208}" y="58" fill="${INK}" font-size="13">FAST</text>
+    <rect x="${W - 392}" y="46" width="14" height="14" rx="3" fill="${MINT}"/>
+    <text x="${W - 370}" y="58" fill="${INK}" font-size="13">PSEAL</text>
+    <rect x="${W - 308}" y="46" width="14" height="14" rx="3" fill="${AMBER}"/>
+    <text x="${W - 286}" y="58" fill="${INK}" font-size="13">FAST</text>
+    <rect x="${W - 226}" y="46" width="14" height="14" rx="3" fill="${VIOLET}"/>
+    <text x="${W - 204}" y="58" fill="${INK}" font-size="13">BOLT</text>
     <rect x="${W - 140}" y="46" width="14" height="14" rx="3" fill="${BLUE}"/>
     <text x="${W - 118}" y="58" fill="${INK}" font-size="13">WireGuard</text>
   </g>
   <line x1="56" y1="116" x2="${W - 56}" y2="116" stroke="${GRID}"/>
-  ${panel(156, 'Handshakes per second', 'both PRAETOR profiles share the hybrid handshake', [
+  ${panel(156, 'Handshakes per second', 'all three PRAETOR profiles share the hybrid handshake', [
     ['PRAETOR/1', praetor.handshake_ops_s, MINT],
     ['WireGuard', wg.handshake_ops_s, BLUE],
   ], fmtInt, 'ops/s')}
   ${panel(376, '1 KiB authenticated roundtrips', 'one fixed cell or one WireGuard transport packet', [
     ['PRAETOR PSEAL', praetor1k.ops_s, MINT],
     ['PRAETOR FAST', fast1k.ops_s, AMBER],
+    ['PRAETOR BOLT', bolt1k.ops_s, VIOLET],
     ['WireGuard', wg1k.ops_s, BLUE],
   ], fmtInt, 'roundtrips/s')}
-  ${panel(606, '60 KB full-path throughput', 'fixed-cell framing vs WireGuard transport packet', [
+  ${panel(631, '60 KB full-path throughput', 'fixed-cell framing vs WireGuard transport packet', [
     ['PRAETOR PSEAL', praetor60.mib_s, MINT],
     ['PRAETOR FAST', fast60.mib_s, AMBER],
+    ['PRAETOR BOLT', bolt60.mib_s, VIOLET],
     ['WireGuard', wg60.mib_s, BLUE],
   ], fmtOne, 'MiB/s')}
-  <text x="56" y="826" fill="${MUTED}" font-size="12">FAST: ${ratio(fast1k.ops_s, wg1k.ops_s)}× WireGuard's 1 KiB roundtrip rate and ${ratio(fast60.mib_s, wg60.mib_s)}× its 60 KB throughput on this CPU; both use assembly AEAD backends (ring).</text>
-  <text x="56" y="844" fill="${MUTED}" font-size="12">FAST is weaker by design: no SIV, no per-cell key commitment, and a 32-bit cell counter that caps one key at 2^32 cells. PSEAL remains the default.</text>
-  <text x="56" y="862" fill="${MUTED}" font-size="12">PSEAL pays for two-pass SIV, a 32-byte commitment tag, 80-byte cells and an ML-KEM-768 handshake; handshakes are ${ratio(praetor.handshake_ops_s, wg.handshake_ops_s)}× WireGuard's.</text>
-  <text x="56" y="880" fill="${MUTED}" font-size="12">WireGuard is Cloudflare boringtun 0.7.1 userspace (NoiseIK, X25519, ChaCha20-Poly1305); no TUN/UDP, so these are protocol CPU costs, not VPN wall-clock.</text>
+  <text x="56" y="826" fill="${MUTED}" font-size="12">BOLT: ${ratio(bolt1k.ops_s, wg1k.ops_s)}× WireGuard's 1 KiB roundtrip rate and ${ratio(bolt60.mib_s, wg60.mib_s)}× its 60 KB throughput on this CPU.</text>
+  <text x="56" y="844" fill="${MUTED}" font-size="12">BOLT is AEGIS-128L (ISO/IEC 29192-8) with a 64-bit cell counter and key commitment, but no SIV and only a 128-bit key, so PSEAL remains the default.</text>
+  <text x="56" y="862" fill="${MUTED}" font-size="12">FAST is AES-256-GCM via ring: ${ratio(fast1k.ops_s, wg1k.ops_s)}× the 1 KiB rate and ${ratio(fast60.mib_s, wg60.mib_s)}× the 60 KB throughput. PSEAL pays for two-pass SIV, a 32-byte tag and 80-byte cells.</text>
+  <text x="56" y="880" fill="${MUTED}" font-size="12">Handshakes are ${ratio(praetor.handshake_ops_s, wg.handshake_ops_s)}× WireGuard's: X25519 + ML-KEM-768 costs more than X25519 alone. WireGuard is boringtun 0.7.1; no TUN/UDP, so these are protocol CPU costs.</text>
 </svg>
 `;
 
@@ -97,10 +107,11 @@ writeFileSync(out, svg);
 console.log(`wrote ${out}`);
 console.log(JSON.stringify({
   handshakes: [praetor.handshake_ops_s, wg.handshake_ops_s],
-  roundtrip_1k: [praetor1k.ops_s, fast1k.ops_s, wg1k.ops_s],
-  throughput_60k: [praetor60.mib_s, fast60.mib_s, wg60.mib_s],
+  roundtrip_1k: [praetor1k.ops_s, fast1k.ops_s, bolt1k.ops_s, wg1k.ops_s],
+  throughput_60k: [praetor60.mib_s, fast60.mib_s, bolt60.mib_s, wg60.mib_s],
   ratios: {
     pseal: [ratio(praetor1k.ops_s, wg1k.ops_s), ratio(praetor60.mib_s, wg60.mib_s)],
     fast: [ratio(fast1k.ops_s, wg1k.ops_s), ratio(fast60.mib_s, wg60.mib_s)],
+    bolt: [ratio(bolt1k.ops_s, wg1k.ops_s), ratio(bolt60.mib_s, wg60.mib_s)],
   },
 }, null, 2));

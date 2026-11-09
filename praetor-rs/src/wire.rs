@@ -89,7 +89,19 @@ pub fn pack_cell(cell: &Cell, cell_size: usize) -> Result<Vec<u8>> {
     Ok(out)
 }
 
-pub fn unpack_cell(plain: &[u8], cell_size: usize) -> Result<Cell> {
+/// Borrowed view of one unpacked cell. The payload points into the caller's
+/// plaintext buffer, so parsing a cell does not allocate.
+#[derive(Debug, Clone, Copy)]
+pub struct CellView<'a> {
+    pub kind: u8,
+    pub flags: u8,
+    pub frag_index: u16,
+    pub frag_count: u16,
+    pub msg_id: u64,
+    pub payload: &'a [u8],
+}
+
+pub fn unpack_cell_view(plain: &[u8], cell_size: usize) -> Result<CellView<'_>> {
     if plain.len() != cell_size {
         return Err(Error::Malformed);
     }
@@ -110,13 +122,25 @@ pub fn unpack_cell(plain: &[u8], cell_size: usize) -> Result<Cell> {
     if payload_len > cell_size - CELL_HEADER_BYTES {
         return Err(Error::Malformed);
     }
-    Ok(Cell {
+    Ok(CellView {
         kind,
         flags: plain[1],
         frag_index,
         frag_count,
         msg_id,
-        payload: plain[16..16 + payload_len].to_vec(),
+        payload: &plain[16..16 + payload_len],
+    })
+}
+
+pub fn unpack_cell(plain: &[u8], cell_size: usize) -> Result<Cell> {
+    let view = unpack_cell_view(plain, cell_size)?;
+    Ok(Cell {
+        kind: view.kind,
+        flags: view.flags,
+        frag_index: view.frag_index,
+        frag_count: view.frag_count,
+        msg_id: view.msg_id,
+        payload: view.payload.to_vec(),
     })
 }
 
@@ -242,6 +266,17 @@ pub enum Received {
     Padding,
     Fragment { kind: u8, msg_id: u64 },
     Complete { msg_id: u64, data: Vec<u8> },
+}
+
+/// Borrowed receive result. `Complete` points into the caller's wire buffer,
+/// so a single-cell message is decoded without allocating. Fragmented
+/// messages still assemble into an owned `Assembled` value.
+#[derive(Debug)]
+pub enum ReceivedRef<'a> {
+    Padding,
+    Fragment { kind: u8, msg_id: u64 },
+    Complete { msg_id: u64, data: &'a [u8] },
+    Assembled { msg_id: u64, data: Vec<u8> },
 }
 
 pub struct SecureChannel {
