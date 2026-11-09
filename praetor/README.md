@@ -157,6 +157,8 @@ and not yet negotiated by the JavaScript or desktop transports; it measured
 1.15 GiB/s sealing at 1 MiB versus PSEAL's 499 MiB/s. See
 [`docs/PMARINE.md`](docs/PMARINE.md).
 
+![PMARINE AEGIS-256 lane variants versus BOLT](docs/benchmarks-pmarine-aegis.svg)
+
 ![PRAETOR/1 vs WireGuard](docs/benchmarks-praetor-vs-wireguard.svg)
 
 Against Cloudflare `boringtun` 0.7.1 (userspace WireGuard, same CPU, single

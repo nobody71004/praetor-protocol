@@ -4,8 +4,8 @@ PRAETOR Command is a Windows desktop control plane built with Electron, React, a
 [MCP](https://modelcontextprotocol.io/) server. It combines a PRAETOR/1 crypto-profile manager,
 header-art slots, cursor-reactive visuals, a tool catalog, and an agent fabric.
 
-> **Data plane:** connecting a PSEAL profile opens a real PRAETOR/1 TCP session to the Dallas
-> egress host, multiplexes TCP streams over it, and points the Windows system proxy at a local
+> **Data plane:** connecting a PSEAL profile opens a real PRAETOR/1 TCP session to the
+> configured egress host, multiplexes TCP streams over it, and points the Windows system proxy at a local
 > SOCKS5 listener while the session is up. Traffic counters, handshake time, and the session log
 > come from that transport. The MCP server, tool execution, audit log, and agent loop are local.
 
@@ -60,8 +60,8 @@ The Overview page switches the active profile. Switching while a session is acti
 previous session and starts a new PRAETOR handshake. Client X-Wing keypairs are ephemeral per
 handshake and are never written to a profile.
 
-The seeded **Nexus PSEAL** profile pins the Dallas server's 1,216-byte X-Wing public key and points at
-`104.251.218.227:9443`. **Nexus FAST**, **Nexus BOLT** and **Nexus PMARINE** also connect
+The seeded **Nexus PSEAL** profile pins a reference server's 1,216-byte X-Wing public key and points at
+its bundled endpoint. **Nexus FAST**, **Nexus BOLT** and **Nexus PMARINE** also connect
 successfully, using the PSEAL transport that the current egress implements; the app reports `PSEAL`
 as the negotiated suite and labels the requested profile in Activity. The PMARINE preset is
 marked experimental; the Rust `PmarineChannel` is not negotiated by the desktop client yet. To use
@@ -153,9 +153,9 @@ without an API key.
 
 - Renderer production build and CSS class audit pass.
 - The profile store is exercised for PRAETOR defaults, schema migration, and profile save/load.
-- The PRAETOR client completed a real handshake against the Dallas host (199 ms); `ipinfo.io`,
-  `ipify`, and `speedtest.net` returned through the SOCKS5 egress with public IP
-  `104.251.218.227`.
+- The PRAETOR client completed a real handshake against a self-hosted test exit (199 ms);
+  `ipinfo.io`, `ipify`, and `speedtest.net` returned through the SOCKS5 egress with that exit's
+  public IP.
 - The MCP diagnostic passes under both Node and the packaged Electron runtime: 36 tools, 7/7 steps.
 - The portable EXE launches the packaged app, stages its MCP runtime, and reports the Agent Fabric page
   as `MCP ONLINE` in guarded mode.

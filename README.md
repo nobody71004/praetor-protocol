@@ -68,7 +68,7 @@ The desktop app does **not** speak WireGuard. It does not create a TUN device, c
 flowchart TB
   UI["PRAETOR Command<br/>Electron + React"] --> MCP["Local MCP runtime<br/>36 tools"]
   UI --> CLIENT["PRAETOR/1 client<br/>pinned X-Wing handshake"]
-  CLIENT -->|"TCP 9443 · fixed cells"| EXIT["PRAETOR egress<br/>Dallas or self-hosted"]
+  CLIENT -->|"TCP 9443 · fixed cells"| EXIT["PRAETOR egress<br/>self-hosted"]
   EXIT --> NET["Internet"]
   UI --> PROXY["SOCKS5 listener<br/>127.0.0.1:17890"]
   PROXY --> CLIENT
@@ -119,22 +119,25 @@ Single process, single thread, release builds on Windows x64. These are protocol
 
 ### Transport profiles
 
-| Workload | PSEAL | FAST | BOLT | WireGuard (boringtun) |
-|---|---:|---:|---:|---:|
-| Full handshakes/s | 3,487 | 3,487 | 3,487 | 4,042 |
-| 1 KiB authenticated roundtrips/s | 147,264 | 3,223,207 | 3,875,218 | 973,084 |
-| 60 KB full-path throughput | 143.1 MiB/s | 4,346.0 MiB/s | 5,830.4 MiB/s | 1,303.8 MiB/s |
+![PRAETOR/1 transport profiles versus WireGuard](praetor/docs/benchmarks-praetor-vs-wireguard.svg)
 
-The WireGuard column is userspace `boringtun` 0.7.1, not kernel WireGuard. PSEAL pays for two-pass SIV, the independent commitment tag, 80-byte cells and the hybrid handshake; FAST and BOLT are opt-in profiles without SIV.
+The WireGuard series is userspace `boringtun` 0.7.1, not kernel WireGuard. PSEAL pays for two-pass SIV, the independent commitment tag, 80-byte cells and the hybrid handshake; FAST and BOLT are opt-in profiles without SIV.
 
 ### PMARINE: SIV + AEGIS-256
 
-`pmarine-aegis-bench` measures AEGIS-256, AEGIS-256X2 and AEGIS-256X4 through the real 80-byte SIV envelope and `PmarineChannel` fixed-cell channel. Results are medians of three timed runs on the same Windows x64 machine (AES/VAES/AVX2; no AVX-512). Run it with:
+`pmarine-aegis-bench` measures AEGIS-256, AEGIS-256X2 and AEGIS-256X4 through the real 80-byte SIV envelope and `PmarineChannel` fixed-cell channel. Results are medians of three timed runs on the same Windows x64 machine (AES/VAES/AVX2; no AVX-512).
+
+![PMARINE AEGIS-256 lane variants versus BOLT](praetor/docs/benchmarks-pmarine-aegis.svg)
+
+Run it with:
 
 ```bash
 cd praetor-rs
 ./cargo.sh run --release --bin pmarine-aegis-bench
 ```
+
+<details>
+<summary>Exact PMARINE measurements</summary>
 
 #### Envelope throughput (MiB/s)
 
@@ -154,6 +157,8 @@ cd praetor-rs
 | AEGIS-256 | 621,610 | 867.8 MiB/s | 0.14× / 0.14× |
 | AEGIS-256X2 | 627,274 | 935.6 MiB/s | 0.14× / 0.15× |
 | AEGIS-256X4 | 587,889 | 947.8 MiB/s | 0.14× / 0.15× |
+
+</details>
 
 BOLT's fixed-cell channel measured **4,165.2 MiB/s** at 1 KiB and **6,246.8 MiB/s** at 60 KB in the same run. The serial HMAC-SHA256 SIV is now the dominant per-cell cost—the SIV alone measures 1,761.5 MiB/s at 1 KiB and 2,386.9 MiB/s at 60 KB—so X2/X4 speed up only the AEGIS portion and do not close the BOLT gap. PMARINE is the stronger commitment envelope, not a BOLT competitor.
 
@@ -181,7 +186,7 @@ BOLT's fixed-cell channel measured **4,165.2 MiB/s** at 1 KiB and **6,246.8 MiB/
 ### Requirements
 
 - Windows 10 or 11, x64.
-- Outbound TCP to the egress endpoint (default `104.251.218.227:9443`).
+- Outbound TCP to the egress endpoint configured in your profile.
 - No Node installation is required to run the packaged app. Node.js 20+ is only needed for external MCP clients.
 
 ### Step 1 — Download the portable EXE
@@ -229,11 +234,7 @@ The EXE is unsigned. If SmartScreen appears, choose **More info → Run anyway**
 curl.exe --socks5-hostname 127.0.0.1:17890 https://ipinfo.io/json
 ```
 
-The default Dallas exit should report Dallas, Texas and:
-
-```text
-104.251.218.227
-```
+The response should show the public address of the egress you configured. This guide does not publish a shared exit address.
 
 If the app chose a different local port because `17890` was occupied, use the port shown in the session card.
 
@@ -408,12 +409,12 @@ Each profile stores only client-side configuration:
 |---|---|
 | `protocol` | Always `PRAETOR/1` |
 | `suite` | `PSEAL`, `FAST`, `BOLT`, or `PMARINE` |
-| `endpoint` | TCP `host:port`; default `104.251.218.227:9443` |
+| `endpoint` | TCP `host:port` for your egress |
 | `cellSize` | Fixed framing size; both ends must match; default `1024` |
 | `serverPublicKey` | Pinned 1,216-byte X-Wing public key (base64) |
 | `autoConnect` | Connect when the app starts, if global auto-connect is enabled |
 
-The seeded profiles point at the Dallas egress and pin its public key. To use your own exit, replace the endpoint and pinned key in the profile editor, or change the defaults in:
+The seeded profiles pin the bundled reference key and endpoint. To use your own exit, replace both in the profile editor, or change the defaults in:
 
 - [`desktop/src/lib/praetor.js`](desktop/src/lib/praetor.js)
 - [`desktop/electron/store.cjs`](desktop/electron/store.cjs)
@@ -506,7 +507,7 @@ The script:
 4. Installs `praetor-ingress-rule.sh`.
 5. Enables both units and prints the service status.
 
-Defaults are `root@104.251.218.227` and `tmp/relay_ed25519`. Override both for your host.
+Set `PRAETOR_EGRESS_SSH` and `PRAETOR_EGRESS_SSH_KEY` explicitly for your host; no public deployment target is documented here.
 
 The ingress helper adds:
 
@@ -530,7 +531,7 @@ From the repository root:
 
 ```bash
 node praetor/bin/praetor-proxy.js \
-  --host 104.251.218.227 --port 9443 \
+  --host egress.example.com --port 9443 \
   --server-key desktop/server/keys/praetor-server.pub \
   --listen 1080
 ```
@@ -541,7 +542,7 @@ In another terminal:
 curl --socks5-hostname 127.0.0.1:1080 https://ipinfo.io/json
 ```
 
-The response must show `"ip": "104.251.218.227"` for the default Dallas exit, or your own host's public address for a custom exit.
+The response must show your egress host's public address.
 
 ### Egress security notes
 
@@ -630,7 +631,7 @@ Last verified: **2026-11-09**, Windows x64, release build.
 | Schema-3 → schema-4 migration | PMARINE injected and persisted once |
 | Portable EXE packaged | `PRAETOR-Command-1.0.0.exe`, 80,679,566 bytes |
 | Release asset digest | `sha256:330efb4e3d000e8bcca5766b1ac7ed4eba86cf03e2730e52f4a5841563d79e6c` |
-| Real TCP egress | PSEAL handshake and SOCKS5 traffic verified against the Dallas exit |
+| Real TCP egress | PSEAL handshake and SOCKS5 traffic verified against a self-hosted test exit |
 
 The protocol tests cover roundtrips, tamper rejection, replay rejection, padding, key separation, handshake impersonation, KEM implicit rejection, guard policy, audit-chain tampering, Shamir custody, proof-of-work admission, and the PMARINE channel geometry.
 
@@ -647,7 +648,7 @@ The protocol tests cover roundtrips, tamper rejection, replay rejection, padding
 - **No client authentication on the reference egress.** The public key identifies the server, not the user.
 - **The EXE is unsigned.** Verify the SHA-256 before running it.
 - **The system proxy is not a TUN.** Apps with their own network stack can bypass it.
-- **Do not commit private keys.** The repository contains a public key only; treat `server.key`, `praetor-server.key`, and `tmp/relay_ed25519` as secrets.
+- **Do not commit private keys.** The repository contains a public key only; treat `server.key` and `praetor-server.key` as secrets.
 
 Read [`praetor/docs/SECURITY.md`](praetor/docs/SECURITY.md), [`THREAT-MODEL.md`](praetor/docs/THREAT-MODEL.md), and [`SECURITY-REVIEW.md`](praetor/docs/SECURITY-REVIEW.md) before making deployment decisions.
 

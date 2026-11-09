@@ -1,6 +1,6 @@
 # PRAETOR egress server
 
-This directory contains the Dallas exit for PRAETOR Command. The server is a
+This directory contains an optional self-hosted egress for PRAETOR Command. The server is a
 self-contained Node 22 bundle: it terminates the PRAETOR/1 session, opens ordinary
 outbound TCP sockets for each multiplexed `CONNECT`, and never creates a TUN
 device or changes IP forwarding.
@@ -62,9 +62,8 @@ bash vanta-repo/desktop/server/deploy.sh
 ```
 
 The script copies the bundle and key, installs the two units and the ingress
-helper, then enables and starts them. It defaults to `root@104.251.218.227` and
-`tmp/relay_ed25519`; override with `PRAETOR_EGRESS_SSH` and
-`PRAETOR_EGRESS_SSH_KEY`.
+helper, then enables and starts them. Set `PRAETOR_EGRESS_SSH` to your SSH target
+and `PRAETOR_EGRESS_SSH_KEY` to the matching private key path before running it.
 
 Nexus Shield owns `table inet nexus_edge` and regenerates it from
 `/etc/nexus-shield/config.json`. `praetor-ingress.service` is `PartOf` the shield
@@ -85,14 +84,14 @@ Test the real egress from the client machine:
 
 ```bash
 node praetor/bin/praetor-proxy.js \
-  --host 104.251.218.227 --port 9443 \
+  --host egress.example.com --port 9443 \
   --server-key vanta-repo/desktop/server/keys/praetor-server.pub \
   --listen 1080
 
 curl --socks5-hostname 127.0.0.1:1080 https://ipinfo.io/json
 ```
 
-The response must show `"ip": "104.251.218.227"` and Dallas, Texas.
+The response must show your egress host's public IP.
 
 ## Security notes
 
