@@ -59,7 +59,7 @@ Rust implementation:
 
 ```bash
 cd vanta-rs
-./cargo.sh test           # 13 tests, byte-compatible with the JS vectors
+./cargo.sh test           # 14 tests, byte-compatible with the JS vectors
 ./cargo.sh run --release -- selftest
 ./cargo.sh run --release -- bench
 ```

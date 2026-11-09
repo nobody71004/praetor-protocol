@@ -47,9 +47,10 @@ truncates padding automatically.
   container roundtrip/truncation, policy binding, lockout, audit-chain edit
   detection, Shamir and PoW.
 
-Current status: `13 passed` (8 roundtrip + 5 vectors), release build. The
-roundtrip tests include atomic file decryption: a truncated container must not
-clobber the destination or leave partial plaintext.
+Current status: `14 passed` (9 roundtrip + 5 vectors), release build. The
+roundtrip tests include atomic file decryption and single-use admission
+tickets: a truncated container must not clobber the destination or leave
+partial plaintext.
 
 ## Performance
 

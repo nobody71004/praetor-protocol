@@ -10,7 +10,7 @@ independent audit. It should not
 protect life-critical, classified, or high-value production data until the work
 in §6 is done.
 
-What it does have: a byte-level specification, 59 JavaScript and 13 Rust
+What it does have: a byte-level specification, 59 JavaScript and 14 Rust
 automated tests (including shared cross-language vectors) covering
 tamper/replay/truncation/downgrade/policy failures, shared cross-language test
 vectors, randomized property tests, and an explicit threat model.
