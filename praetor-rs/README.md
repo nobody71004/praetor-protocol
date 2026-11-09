@@ -68,7 +68,7 @@ Measured on the development machine (Windows x64, release):
 |---|---:|
 | PSEAL seal, 1 MiB | 498.9 MiB/s |
 | PSEAL open, 1 MiB | 570.8 MiB/s |
-| X-Wing decapsulation (libcrux AVX2) | 68,309 ops/s |
+| ML-KEM-768 decapsulation (libcrux AVX2) | 68,309 ops/s |
 | Full handshake | 3,487 ops/s |
 | FAST 1 KiB roundtrips (zero-copy) | 3,223,207 ops/s |
 | FAST 60 KB full path (zero-copy) | 4,346.0 MiB/s |

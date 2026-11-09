@@ -147,7 +147,7 @@ FAST and BOLT are weaker than PSEAL by design; see
 ![PRAETOR/1 vs WireGuard](docs/benchmarks-praetor-vs-wireguard.svg)
 
 Against Cloudflare `boringtun` 0.7.1 (userspace WireGuard, same CPU, single
-thread), medians of three runs in one session: **3,487 handshakes/s** vs
+thread), medians of three runs on the same machine: **3,487 handshakes/s** vs
 **4,042**; PSEAL **147k 1 KiB roundtrips/s** and **143.1 MiB/s** at 60 KB;
 FAST **3.22M** and **4,346.0 MiB/s**; BOLT **3.88M** and **5,830.4 MiB/s**,
 versus WireGuard's **973k** and **1,303.8 MiB/s**. All three PRAETOR transport

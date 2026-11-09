@@ -80,9 +80,10 @@ decrypts it with Rust, then the reverse, comparing the recovered bytes.
 | 1 MiB PSEAL seal+open (no cell framing) | 265.8 MiB/s | — | — | — | — | — | — |
 
 Both builds are Rust release with LTO, measured on the same Windows x64
-machine, single thread. Values are the median of three runs in one session;
-run-to-run CPU frequency variation on this machine is large enough that only
-same-session ratios should be compared. `boringtun` performs the real NoiseIK
+machine, single thread. Each row is the median of three runs; the handshake
+row and the transport rows come from separate sessions on the same machine.
+Run-to-run CPU frequency variation is large enough that only same-session
+ratios should be compared. `boringtun` performs the real NoiseIK
 handshake and transport encryption in process. It is **not** kernel WireGuard
 and there is no TUN, UDP, routing or syscall path in either number: these are
 protocol CPU costs, not VPN wall-clock. Raw data and the harness live in
