@@ -83,7 +83,7 @@ dependency set; reproducible test command. This does not eliminate the risk —
 verify the lockfile and build artifacts yourself.
 
 ### A8. Cryptanalytic advance
-A break in ChaCha20-Poly1305, SHA-256, X25519, or ML-KEM-768.
+A break in ChaCha20-Poly1305, AEGIS-256, SHA-256, X25519, or ML-KEM-768.
 
 **Mitigations:** hybrid KEM; 256-bit symmetric keys; versioned suites. There is
 no agility *negotiation* (which would enable downgrade); migration is an
@@ -106,10 +106,10 @@ design's dependency on it is deliberate and documented.
 
 | Objective | Mechanism | Residual |
 |---|---|---|
-| Confidentiality | PSEAL (SIV + ChaCha20-Poly1305) | 2^-128 per forgery under standard assumptions |
-| Integrity | independent commitment tag + AEAD | same |
-| Nonce-misuse resistance | SIV prefix | equality leak only in deterministic mode |
-| Key commitment | `k_com` tag over ciphertext | negligible |
+| Confidentiality | PSEAL/1 (SIV + ChaCha20-Poly1305); PMARINE/1 (SIV + AEGIS-256, experimental) | 2^-128 per forgery under standard assumptions |
+| Integrity | independent commitment tag + AEAD; PMARINE 32-byte AEGIS tag + SIV check | same |
+| Nonce-misuse resistance | SIV prefix in PSEAL and PMARINE | equality leak only in deterministic mode |
+| Key commitment | PSEAL `k_com` tag; PMARINE 32-byte SIV check | negligible |
 | Forward secrecy | ephemeral client KEM + ratchet | static server key compromise after session is survivable |
 | Post-quantum | hybrid X25519 + ML-KEM-768 | either component may fall |
 | Length privacy | Padmé + fixed cells | O(log log M) bits; cell count still visible without cover |

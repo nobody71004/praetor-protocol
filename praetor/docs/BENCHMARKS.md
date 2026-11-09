@@ -47,6 +47,28 @@ uses libcrux's AVX2-dispatched ML-KEM-768 and reuses the X25519 public key each
 side already holds during decapsulation; the previous portable `ml-kem`
 backend measured 10,364 decaps/s.
 
+## PMARINE (experimental PSEAL/2)
+
+PMARINE uses AEGIS-256 (RFC 10032) with a full 32-byte SIV and a 32-byte tag,
+while keeping PSEAL's 80-byte envelope and SIV/commitment checks. It is
+Rust-only and is not a fixed-cell transport yet. The PSEAL and PMARINE columns
+below are medians of the same three-run session; the older PSEAL table above is
+from a different session.
+
+| operation | bytes | PSEAL MiB/s | PMARINE MiB/s | speedup |
+|---|---:|---:|---:|---:|
+| seal | 1,024 | 301.1 | 1,136.5 | **3.77×** |
+| open | 1,024 | 294.8 | 1,011.8 | **3.43×** |
+| seal | 60,000 | 473.6 | 1,687.6 | **3.56×** |
+| open | 60,000 | 619.6 | 1,658.3 | **2.68×** |
+| seal | 1,048,576 | 485.5 | 1,174.7 | **2.42×** |
+| open | 1,048,576 | 553.9 | 1,184.4 | **2.14×** |
+
+The SIV HMAC is now the dominant cost; the AEGIS-256 pass is much faster.
+PMARINE therefore beats PSEAL but remains below the SIV-free FAST and BOLT
+transport profiles. It is a stronger envelope, not the fastest possible cell
+cipher.
+
 ## What the numbers mean
 
 * Bulk AEAD throughput is comparable between the two builds (both bind optimized
@@ -171,6 +193,7 @@ but is key-committing and uses a 64-bit counter. See [`FAST.md`](FAST.md) and
 ```bash
 cd praetor-rs
 ./cargo.sh test --release
+./cargo.sh test --release --test pmarine
 ./cargo.sh run --release --bin protocol-bench
 ```
 

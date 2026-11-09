@@ -1,9 +1,9 @@
 # PRAETOR/1 — Rust implementation
 
 Byte-compatible with the JavaScript reference in `../praetor`. The crate contains
-PSEAL/1, PRAETOR/WIRE, PRAETOR/FAST, PRAETOR/BOLT, PRAETOR-HS/1
-(X25519 + ML-KEM-768), PRAETOR/CONTAINER and the PRAETOR/GUARD capability
-layer.
+PSEAL/1, PRAETOR/WIRE, PRAETOR/FAST, PRAETOR/BOLT, PRAETOR/PMARINE (experimental
+PSEAL/2 on AEGIS-256), PRAETOR-HS/1 (X25519 + ML-KEM-768), PRAETOR/CONTAINER and
+the PRAETOR/GUARD capability layer.
 
 ## Toolchain
 
@@ -53,8 +53,8 @@ truncates padding automatically.
   container roundtrip/truncation, policy binding, lockout, audit-chain edit
   detection, Shamir and PoW.
 
-Current status: `24 passed` (9 roundtrip + 5 vectors + 4 fast + 6 bolt), release
-build. The roundtrip tests include atomic file decryption and single-use
+Current status: `34 passed` (9 roundtrip + 5 vectors + 4 fast + 6 bolt + 10
+pmarine), release build. The roundtrip tests include atomic file decryption and single-use
 admission tickets: a truncated container must not clobber the destination or
 leave partial plaintext. The fast and bolt tests cover fragmentation, both
 calling conventions, tamper rejection, replay rejection, padding cells and key
@@ -74,11 +74,18 @@ Measured on the development machine (Windows x64, release):
 | FAST 60 KB full path (zero-copy) | 4,346.0 MiB/s |
 | BOLT 1 KiB roundtrips (zero-copy) | 3,875,218 ops/s |
 | BOLT 60 KB full path (zero-copy) | 5,830.4 MiB/s |
+| PMARINE seal, 1 KiB | 1,136.5 MiB/s |
+| PMARINE open, 1 KiB | 1,011.8 MiB/s |
+| PMARINE seal, 60 KB | 1,687.6 MiB/s |
+| PMARINE open, 60 KB | 1,658.3 MiB/s |
+| PMARINE seal, 1 MiB | 1,174.7 MiB/s |
+| PMARINE open, 1 MiB | 1,184.4 MiB/s |
 
 BOLT uses AEGIS-128L through the `aegis` crate; FAST uses `ring`'s
-AES-256-GCM. In the same session BOLT beats userspace WireGuard by 3.98× on
-1 KiB roundtrips and 4.47× on 60 KB throughput, and beats FAST by 1.20× and
-1.34×. The ML-KEM-768 handshake is now 0.86× (up from 0.60×) after switching
+AES-256-GCM. PMARINE uses the same crate's AEGIS-256 with a 32-byte SIV and a
+32-byte tag; it is an envelope profile, not a fixed-cell transport. In the same
+session BOLT beats userspace WireGuard by 3.98× on 1 KiB roundtrips and 4.47×
+on 60 KB throughput, and beats FAST by 1.20× and 1.34×. The ML-KEM-768 handshake is now 0.86× (up from 0.60×) after switching
 to libcrux's AVX2 implementation and reusing cached X25519 public keys in
 decapsulation; X25519 DH is what remains. See
 `../praetor/docs/BOLT.md` and `../praetor/docs/FAST.md` for the tradeoffs and
@@ -87,7 +94,7 @@ decapsulation; X25519 DH is what remains. See
 ## Security notes
 
 * The crate uses `chacha20poly1305`, `ring` (AES-256-GCM for PRAETOR/FAST),
-  `aegis` (AEGIS-128L for PRAETOR/BOLT), `libcrux-ml-kem 0.0.11`,
+  `aegis` (AEGIS-128L for BOLT and AEGIS-256 for PMARINE), `libcrux-ml-kem 0.0.11`,
   `x25519-dalek 2`, `sha3`, `hkdf`, `hmac` and `scrypt`. ML-KEM decapsulation is treated as
   infallible (implicit rejection); the handshake confirmation is the
   authentication check.
@@ -98,6 +105,12 @@ decapsulation; X25519 DH is what remains. See
   AEGIS-128L key, no SIV, and a stateful 64-bit counter. It is key-committing,
   but PSEAL's independent commitment tag is stronger. FAST's and BOLT's wire
   formats are not in the JS reference.
+* `PRAETOR/PMARINE` is an experimental PSEAL/2 profile: AEGIS-256 (RFC 10032)
+  with a full 32-byte HMAC-SHA256 SIV used as the AEGIS nonce, re-derived after
+  authenticated decryption as the independent commitment. AEGIS's built-in
+  commitment is not full when an attacker controls the associated data
+  (IACR 2023/1495; RFC 10032 §9.1.2), so PMARINE does not rely on it alone.
+  It is Rust-only and not audited; the JS reference does not implement it.
 * All-zero X25519 public keys and shared secrets are rejected.
 * This is a reference implementation, not independently audited, and not a
   FIPS 140-3 validated module. Treat "military-grade" as a procurement claim,

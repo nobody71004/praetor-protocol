@@ -7,6 +7,7 @@ use praetor::aead::{SealKey, OVERHEAD};
 use praetor::container;
 use praetor::error::{Error, Result};
 use praetor::padme::padme;
+use praetor::pmarine::PmarineKey;
 use praetor::util::u32be;
 
 fn usage() {
@@ -285,10 +286,18 @@ fn selftest() -> Result<()> {
     let mut bad = env.clone();
     bad[100] ^= 1;
     assert!(sk.open(&bad, b"selftest", false).is_err(), "tamper");
+
+    let pm = PmarineKey::new(&key)?;
+    let pm_env = pm.seal_random(&pt, b"selftest")?;
+    assert_eq!(pm.open(&pm_env, b"selftest", false)?, pt, "pmarine roundtrip");
+    let mut pm_bad = pm_env.clone();
+    pm_bad[100] ^= 1;
+    assert!(pm.open(&pm_bad, b"selftest", false).is_err(), "pmarine tamper");
+
     let ct = container::encrypt_bytes(&pt, &key, 1024, None, b"")?;
     let (back, _) = container::decrypt_bytes(&ct, &key)?;
     assert_eq!(back, pt, "container roundtrip");
-    println!("selftest: PASS (pseal, container)");
+    println!("selftest: PASS (pseal, pmarine, container)");
     Ok(())
 }
 

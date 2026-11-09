@@ -30,13 +30,37 @@ ChaCha20 is several times faster than AES-GCM.
 **Decision:** ChaCha20-Poly1305 (RFC 8439) as the inner AEAD. Rationale: uniform
 performance across x86/ARM/low-end, no cache-timing dependence on table lookups,
 and a simple, widely implemented standard. AES-GCM would be faster on
-AES-NI-only fleets; that is a suite-2 option, not a correctness issue. AEGIS
-remains a performance upgrade path once its implementations are as ubiquitous.
+AES-NI-only fleets; that is a suite-2 option, not a correctness issue. The
+experimental PMARINE profile takes the AEGIS path with AEGIS-256; PSEAL/1
+remains the portable default.
 
 AES-GCM-SIV (RFC 8452) was considered for nonce-misuse resistance. It is
 excellent but AES-bound; PRAETOR needs to run well on machines without AES
 acceleration. Building SIV from HMAC-SHA-256 + ChaCha20-Poly1305 gives the same
 misuse-resistance property with a portable primitive set.
+
+### 2.1 PMARINE (PSEAL/2) — AEGIS-256
+
+The experimental PMARINE profile uses AEGIS-256 (RFC 10032) for the inner
+AEAD. AEGIS-256 gives a 256-bit key, 256-bit nonce and 256-bit tag, and
+libaegis uses AES-NI or ARM crypto instructions when available. The full
+32-byte SIV is used as the AEGIS nonce, so nonce-misuse resistance is retained
+without a second cipher.
+
+AEGIS's built-in key commitment is not sufficient on its own. RFC 10032 §9.1.2
+limits full commitment to the setting where the adversary cannot control the
+associated data, and Isobe–Rahman (IACR ePrint 2023/1495) give an O(1) attack
+that produces multiple verifying keys when `ad` is attacker-controlled. PMARINE
+therefore re-derives the 32-byte SIV after AEGIS authentication and compares it
+in constant time; that independent check is the commitment.
+
+AES-GCM-SIV and Deoxys-II are both strong MRAE designs (RFC 9771). Neither was
+chosen here: AES-GCM-SIV is AES-bound and has a 96-bit nonce, Deoxys-II would
+add another dependency and targets a 128-bit block/key, and AEGIS-256 was
+already in the crate for BOLT. Ascon-AEAD128 is a NIST standard (SP 800-232)
+but has a 128-bit key and lower software throughput. The choice is a profile,
+not a new primitive; inventing a new low-level cipher remains rejected under
+CWE-1240.
 
 ## 3. SIV and commitment
 
@@ -120,6 +144,7 @@ controls here come from established practice:
 | Option | Why rejected |
 |---|---|
 | New ARX/SPN block cipher | No cryptanalysis, CWE-1240; unacceptable |
+| New low-level cipher for PMARINE | Same CWE-1240 reason; PMARINE composes AEGIS-256 instead |
 | Custom sponge mode | Same; would need years of analysis |
 | AES-GCM only | Terrible nonce-reuse failure; slow without AES-NI |
 | GCM-SIV only | AES-bound; less portable |
@@ -155,6 +180,11 @@ reference-grade protocol with explicit threat modelling** — not "military-grad
 - RFC 8439 — https://www.rfc-editor.org/rfc/rfc8439
 - RFC 5297 (SIV) — https://www.rfc-editor.org/rfc/rfc5297
 - RFC 8452 (AES-GCM-SIV) — https://www.rfc-editor.org/rfc/rfc8452
+- RFC 10032 (AEGIS) — https://www.rfc-editor.org/rfc/rfc10032.html
+- IACR ePrint 2023/1495 (AEGIS key commitment) — https://eprint.iacr.org/2023/1495
+- RFC 9771 (AEAD properties) — https://www.rfc-editor.org/rfc/rfc9771.html
+- NIST SP 800-232 (Ascon) — https://csrc.nist.gov/pubs/sp/800/232/final
+- Deoxys-II v1.41 — https://competitions.cr.yp.to/round3/deoxysv141.pdf
 - RFC 5869 (HKDF) — https://www.rfc-editor.org/rfc/rfc5869
 - FIPS 203 (ML-KEM) — https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.203.pdf
 - X-Wing — https://eprint.iacr.org/2024/039

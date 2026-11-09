@@ -43,12 +43,15 @@ cryptanalysis. Do not treat novelty as a proof of strength.
 | Layer | Status |
 |---|---|
 | **PSEAL/1** | New AEAD construction: SIV prefix + ChaCha20-Poly1305 + independent commitment tag |
+| **PRAETOR/PMARINE** | Experimental PSEAL/2 profile: SIV + AEGIS-256, not a new primitive |
 | **PRAETOR/WIRE** | Fixed-cell framing with trial decryption over a bounded epoch window |
 | **PRAETOR-HS/1** | Hybrid X25519 + ML-KEM-768 handshake with two-sided confirmation |
 | **PRAETOR/GUARD** | Capability, quota, audit, custody and admission enforcement |
 
-PSEAL is the new cryptographic primitive in this project. It is not a new
-low-level cipher, and this repository does not claim that it is.
+PSEAL is the new cryptographic construction in this project. It is not a new
+low-level cipher, and this repository does not claim that it is. PMARINE is a
+profile built from standard primitives (AEGIS-256 and HMAC-SHA-256), not a
+third cipher; it is experimental and unaudited.
 
 ## Security is not a single benchmark number
 
@@ -82,7 +85,7 @@ Rust implementation:
 
 ```bash
 cd praetor-rs
-./cargo.sh test           # 14 tests, byte-compatible with the JS vectors
+./cargo.sh test           # 34 tests, byte-compatible with the JS vectors
 ./cargo.sh run --release -- selftest
 ./cargo.sh run --release -- bench
 ```
@@ -128,11 +131,13 @@ cd praetor-rs
   checks bundle parity in Node. See [`docs/BROWSER.md`](docs/BROWSER.md).
 
 Measured on one Windows x64 machine, single-threaded: the JS reference seals
-1 MiB at 358 MiB/s and completes 86 handshakes/s; the Rust release build seals
-at 499 MiB/s and completes 3,487 handshakes/s. See
+1 MiB at 358 MiB/s and completes 86 handshakes/s; the Rust release build's
+PSEAL seals at 499 MiB/s and completes 3,487 handshakes/s. The experimental
+PMARINE envelope seals at 1,174.7 MiB/s (median, 1 MiB). See
 [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) for the full tables.
 
-There are three transport profiles. **PSEAL** is the default and is **not**
+There are three transport profiles, plus one experimental envelope profile.
+**PSEAL** is the default and is **not**
 faster than WireGuard: 0.15× the 1 KiB roundtrip rate and 0.11× the 60 KB
 throughput, the measured cost of two-pass SIV, the commitment tag, 80-byte
 cells and ML-KEM-768. **PRAETOR/FAST** (AES-256-GCM via `ring`) reaches
@@ -143,6 +148,13 @@ is now **0.86×** (up from 0.60×); after moving ML-KEM to libcrux's AVX2
 backend, X25519 DH dominates the remaining cost.
 FAST and BOLT are weaker than PSEAL by design; see
 [`docs/FAST.md`](docs/FAST.md) and [`docs/BOLT.md`](docs/BOLT.md).
+
+**PRAETOR/PMARINE** is the experimental PSEAL/2 envelope: it keeps PSEAL's
+SIV and 80-byte overhead but replaces the inner AEAD and separate commitment
+tag with AEGIS-256 (RFC 10032), a 32-byte SIV used as the AEGIS nonce and
+re-derived after decryption. It is Rust-only, is not a transport profile yet,
+and is not the default; it measured 1.15 GiB/s sealing at 1 MiB versus PSEAL's
+499 MiB/s. See [`docs/PMARINE.md`](docs/PMARINE.md).
 
 ![PRAETOR/1 vs WireGuard](docs/benchmarks-praetor-vs-wireguard.svg)
 
@@ -160,6 +172,7 @@ Full byte-level specification: [`docs/DESIGN.md`](docs/DESIGN.md).
 Adversary analysis incl. rogue agents and mass coordination:
 [`docs/THREAT-MODEL.md`](docs/THREAT-MODEL.md).
 Literature and rationale: [`docs/RESEARCH.md`](docs/RESEARCH.md).
+Experimental PMARINE profile: [`docs/PMARINE.md`](docs/PMARINE.md).
 Measured performance: [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md).
 Adversarial review, findings and fixes:
 [`docs/SECURITY-REVIEW.md`](docs/SECURITY-REVIEW.md).
@@ -168,6 +181,8 @@ Adversarial review, findings and fixes:
 
 * **PSEAL overhead:** 80 bytes (16 nonce + 16 SIV prefix + 16 Poly1305 tag +
   32 commitment tag). Deterministic mode: 64 bytes.
+* **PMARINE overhead:** 80 bytes probabilistic, 64 deterministic, with a
+  32-byte SIV and 32-byte AEGIS-256 tag. Experimental and Rust-only.
 * **Cell overhead:** 80 bytes; 1024-byte cell → 1104 bytes on the wire.
 * **No cleartext structure:** no magic, version, suite id, message length or
   record count is visible. A wrong key sees random bytes.

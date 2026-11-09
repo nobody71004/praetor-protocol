@@ -2,15 +2,16 @@
 
 ## Summary
 
-PRAETOR/1 is a **reference implementation of a new protocol composition**. It has
-not been independently audited, formally verified, or certified. A
+PRAETOR/1 is a **reference implementation of a new protocol composition**. Its
+experimental PMARINE profile is a second composition, built on AEGIS-256. None
+of it has been independently audited, formally verified, or certified. A
 maintainer-run adversarial review with fixes is in
 [`SECURITY-REVIEW.md`](SECURITY-REVIEW.md); it is not a substitute for an
 independent audit. It should not
 protect life-critical, classified, or high-value production data until the work
 in §6 is done.
 
-What it does have: a byte-level specification, 59 JavaScript and 14 Rust
+What it does have: a byte-level specification, 59 JavaScript and 34 Rust
 automated tests (including shared cross-language vectors) covering
 tamper/replay/truncation/downgrade/policy failures, shared cross-language test
 vectors, randomized property tests, and an explicit threat model.
@@ -24,6 +25,8 @@ vectors, randomized property tests, and an explicit threat model.
 | Encrypt-then-MAC integrity | Bellare–Namprempre (ASIACRYPT 2000) |
 | Hybrid PQ security | X-Wing argument (ePrint 2024/039): secure if either X25519 or ML-KEM-768 is secure |
 | Commitment | HMAC under an independent derived key; forgery requires breaking HMAC-SHA-256 |
+| PMARINE confidentiality/integrity (experimental) | Reduction to AEGIS-256 (RFC 10032) + HMAC-SHA-256 SIV |
+| PMARINE commitment (experimental) | 32-byte SIV re-derived after AEGIS authentication; does not rely on AEGIS's built-in commitment |
 | Forward secrecy | Ephemeral client KEM secret destroyed after the handshake; ratchet erases old keys |
 | Length leakage bound | Padmé analysis (PETS 2019) |
 | Replay/truncation resistance | Protocol invariants, tested |
@@ -54,13 +57,19 @@ verification (ProVerif/Tamarin/CryptoVerif) has been run on the handshake.
    design. This is safer against downgrade but slower to migrate.
 9. **Passphrase mode relies on scrypt N=2^15.** Weak passphrases remain weak;
    use a high-entropy key or Argon2id with tuned parameters where available.
+10. **PMARINE is experimental.** AEGIS-256 is standardized, but the PMARINE
+    composition is unaudited and Rust-only. AEGIS's built-in key commitment is
+    not full when the attacker controls the associated data (IACR ePrint
+    2023/1495; RFC 10032 §9.1.2); PMARINE's post-decryption 32-byte SIV check
+    is the independent commitment. A bad AEGIS tag releases no plaintext.
 
 ## "Military-grade" — an honest reading
 
 The phrase has no formal definition. The properties a defence buyer actually
 means are usually:
 
-- vetted algorithms (yes: ChaCha20, SHA-256, X25519, ML-KEM-768, scrypt);
+- vetted algorithms (yes: ChaCha20, AEGIS-256 for the experimental PMARINE
+  profile, SHA-256, X25519, ML-KEM-768, scrypt);
 - misuse resistance (yes, by construction);
 - post-quantum migration (hybrid, yes; CNSA 2.0 profile, not yet);
 - key lifecycle and split custody (yes, in the guard layer);
@@ -83,7 +92,8 @@ build, or both.
 
 ## Hardening checklist before production
 
-- [ ] Independent audit of PSEAL and PRAETOR-HS/1 (composition, not just primitives)
+- [ ] Independent audit of PSEAL, PMARINE/AEGIS-256 and PRAETOR-HS/1
+      (composition, not just primitives)
 - [ ] Formal verification of the handshake (secrecy, agreement, key confirmation)
 - [ ] Constant-time review of the Rust build; `cargo audit`, `cargo deny`
 - [ ] Fuzz targets for envelope parsing, cell parsing, container parsing

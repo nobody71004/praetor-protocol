@@ -81,6 +81,43 @@ equal envelopes. Probabilistic mode does not leak equality.
 * Caller nonce reuse is safe. Nonce *omission* (deterministic mode) leaks
   equality by design.
 
+### 2.5 PMARINE/1 — experimental PSEAL/2 profile
+
+PMARINE is a Rust-only, opt-in envelope profile. It is **not** the default and
+has not been audited. It keeps the SIV construction but uses AEGIS-256
+(RFC 10032) with a 256-bit tag instead of ChaCha20-Poly1305 plus a separate
+commitment tag.
+
+```
+HKDF-SHA256(K, salt = "PRAETOR/1", info = "pmarine", L = 64)
+    -> k_siv (32) || k_enc (32)
+
+nonce = 16 random bytes                      (probabilistic)
+nonce = ε                                    (deterministic)
+
+siv = HMAC(k_siv,
+           "PMARINE/1/siv" || nonce ||
+           u64(|aad|) || aad ||
+           u64(|pt|)  || pt)                 // 32 bytes
+
+ct || tag = AEGIS-256(k_enc, nonce = siv, pt,
+                      "PMARINE/1/aead" || aad) // 32-byte tag
+
+envelope = nonce || siv || ct || tag
+```
+
+Overhead is **80 bytes** probabilistic and **64 bytes** deterministic. The SIV
+is the AEGIS nonce; distinct plaintexts under one outer nonce therefore get
+distinct AEGIS nonces. Open verifies the AEGIS tag first, then recomputes the
+SIV from the recovered plaintext and compares in constant time. The SIV check is
+the independent commitment and does not rely on AEGIS's built-in commitment,
+which is not full when the adversary controls the associated data
+(IACR ePrint 2023/1495; RFC 10032 §9.1.2).
+
+Limits: AEGIS-256 caps plaintext and associated data at 2^61 − 1 bytes; rotate
+well before 2^64 envelopes. Deterministic mode leaks equality by design.
+PMARINE is not part of the JavaScript reference.
+
 ## 3. PRAETOR/WIRE — fixed cells
 
 ### 3.1 Cell plaintext

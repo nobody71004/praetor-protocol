@@ -8,6 +8,7 @@ use praetor::aead::SealKey;
 use praetor::bolt::{BoltChannel, BOLT_OVERHEAD};
 use praetor::fast::{FastChannel, FAST_OVERHEAD};
 use praetor::handshake;
+use praetor::pmarine::PmarineKey;
 use praetor::wire::{Received, ReceivedRef, SecureChannel};
 
 fn rate(iters: usize, mut f: impl FnMut()) -> f64 {
@@ -46,6 +47,29 @@ fn main() {
         });
         transport.push(json!({
             "size": size,
+            "seal_mib_s": (size as f64 * seal_s) / (1024.0 * 1024.0),
+            "open_mib_s": (size as f64 * open_s) / (1024.0 * 1024.0),
+            "roundtrip_mib_s": (size as f64) / ((1.0 / seal_s) + (1.0 / open_s)) / (1024.0 * 1024.0),
+        }));
+    }
+
+    // PRAETOR/PMARINE: PSEAL-shaped SIV envelope with AEGIS-256 instead of
+    // ChaCha20-Poly1305 plus a separate commitment HMAC.
+    let pmarine = PmarineKey::new(&key).unwrap();
+    let mut pmarine_rows = Vec::new();
+    for size in [64usize, 1024, 60_000, 1_048_576] {
+        let pt = vec![0u8; size];
+        let env = pmarine.seal_random(&pt, b"bench").unwrap();
+        let iters = if size >= 1_048_576 { 64 } else { 4000 };
+        let seal_s = rate(iters, || {
+            black_box(pmarine.seal_random(black_box(&pt), b"bench").unwrap());
+        });
+        let open_s = rate(iters, || {
+            black_box(pmarine.open(black_box(&env), b"bench", false).unwrap());
+        });
+        pmarine_rows.push(json!({
+            "size": size,
+            "overhead": praetor::pmarine::OVERHEAD,
             "seal_mib_s": (size as f64 * seal_s) / (1024.0 * 1024.0),
             "open_mib_s": (size as f64 * open_s) / (1024.0 * 1024.0),
             "roundtrip_mib_s": (size as f64) / ((1.0 / seal_s) + (1.0 / open_s)) / (1024.0 * 1024.0),
@@ -263,6 +287,7 @@ fn main() {
             "implementation": "praetor-rust",
             "cpu": "same machine, single thread",
             "handshake_ops_s": hs,
+            "pmarine": pmarine_rows,
             "cells": cells,
             "fast_cells": fast_cells,
             "fast_buffer": fast_buffer,
