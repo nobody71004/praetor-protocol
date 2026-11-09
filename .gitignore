@@ -3,7 +3,7 @@ target/
 .toolchain/
 *.key
 *.share
-*.vanta
+*.praetor
 *.log
 .env
 .env.*

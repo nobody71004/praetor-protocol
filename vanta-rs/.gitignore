@@ -1,7 +1,0 @@
-target/
-.toolchain/
-rustup-init.exe
-smoke/
-*.key
-*.share
-*.vanta

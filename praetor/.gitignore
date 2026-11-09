@@ -1,0 +1,4 @@
+node_modules/
+*.key
+*.share
+*.praetor

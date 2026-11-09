@@ -1,0 +1,39 @@
+{
+  "implementation": "praetor-rust",
+  "cpu": "same machine, single thread",
+  "runs": 3,
+  "aggregation": "median",
+  "handshake_ops_s": 2176.9686872080597,
+  "cells": [
+    {
+      "size": 1008,
+      "ops_s": 129804.82287223285,
+      "mib_s": 124.78185792466232
+    },
+    {
+      "size": 60000,
+      "ops_s": 2290.346019750799,
+      "mib_s": 131.0546504831771
+    }
+  ],
+  "transport": [
+    {
+      "size": 1024,
+      "seal_mib_s": 273.8537577117218,
+      "open_mib_s": 273.4511725586279,
+      "roundtrip_mib_s": 136.82615853444952
+    },
+    {
+      "size": 60000,
+      "seal_mib_s": 416.6458890361555,
+      "open_mib_s": 544.626086393975,
+      "roundtrip_mib_s": 235.11926797372126
+    },
+    {
+      "size": 1048576,
+      "seal_mib_s": 443.4442313448555,
+      "open_mib_s": 524.0819762476222,
+      "roundtrip_mib_s": 240.20137883097738
+    }
+  ]
+}

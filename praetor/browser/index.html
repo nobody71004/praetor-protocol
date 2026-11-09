@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PRAETOR/1 browser client</title>
+<style>
+  :root { color-scheme: dark; --bg:#0b0f12; --panel:#121a20; --ink:#e7f2ea; --muted:#8fa6a1; --accent:#5ce1b0; --bad:#ff7b72; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:radial-gradient(circle at 20% -10%, #163128, transparent 45%), var(--bg); color:var(--ink); font:15px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  main { max-width: 900px; margin: 0 auto; padding: 48px 22px 80px; }
+  h1 { font-size: clamp(28px, 5vw, 46px); letter-spacing:-0.04em; margin:0 0 6px; }
+  h1 span { color:var(--accent); }
+  p.lede { color:var(--muted); margin:0 0 28px; max-width:70ch; }
+  .panel { background:linear-gradient(180deg,#152027,#10171c); border:1px solid #22323a; border-radius:14px; padding:20px; margin:16px 0; box-shadow:0 18px 50px #0007; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  button { background:var(--accent); color:#04110c; border:0; border-radius:9px; padding:10px 15px; font:inherit; font-weight:700; cursor:pointer; }
+  button.secondary { background:#22323a; color:var(--ink); }
+  textarea { width:100%; min-height:88px; background:#0b1216; color:var(--ink); border:1px solid #2a3c45; border-radius:9px; padding:10px; font:inherit; resize:vertical; }
+  pre { white-space:pre-wrap; word-break:break-word; background:#0b1216; border:1px solid #22323a; border-radius:9px; padding:12px; min-height:58px; margin:12px 0 0; }
+  .ok { color:var(--accent); } .bad { color:var(--bad); } .muted { color:var(--muted); }
+  code { color:#b9f5dd; }
+  ol { color:var(--muted); padding-left:22px; } li { margin:4px 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>PRAETOR<span>/1</span> browser client</h1>
+  <p class="lede">The same post-quantum enforcement protocol that runs in Node and Rust, compiled for the browser with WebCrypto randomness and pure-JS post-quantum primitives. Everything below executes locally; nothing is sent anywhere.</p>
+
+  <section class="panel">
+    <div class="row">
+      <button id="run">Run protocol self-test</button>
+      <span class="muted">handshake · fixed cells · PSEAL · hybrid KEM</span>
+    </div>
+    <pre id="self">idle</pre>
+  </section>
+
+  <section class="panel">
+    <strong>Seal a message</strong>
+    <p class="muted">A fresh 256-bit key is generated per click. The envelope is 80 bytes larger than the plaintext; the commitment tag is verified before decryption.</p>
+    <textarea id="input">the adversary is automated, post-quantum, and already recording</textarea>
+    <div class="row" style="margin-top:10px">
+      <button id="seal">Seal and reopen</button>
+      <span class="muted" id="meta"></span>
+    </div>
+    <pre id="sealed">idle</pre>
+  </section>
+
+  <section class="panel">
+    <strong>What this proves</strong>
+    <ol>
+      <li>Handshake keys agree in the browser and both confirmations verify.</li>
+      <li>A 5 KB message crosses a 512-byte fixed-cell channel and reassembles byte-exactly.</li>
+      <li>PSEAL tamper detection and the container format work without Node APIs.</li>
+    </ol>
+    <p class="muted">This is a reference client, not an audited product. Keys live in page memory only.</p>
+  </section>
+</main>
+<!--PRAETOR_BUNDLE-->
+<script>
+  const text = (s) => new TextEncoder().encode(s);
+  const display = (el, value, ok = true) => {
+    el.textContent = value;
+    el.className = ok ? 'ok' : 'bad';
+  };
+
+  window.runPraetorDemo = function runPraetorDemo() {
+    const out = {};
+    try {
+      const server = PRAETOR.generateServerKeypair();
+      const client = PRAETOR.clientInit(server.publicKey);
+      const serverSide = PRAETOR.serverRespond(server.secretKey, client.message);
+      const clientSide = PRAETOR.clientFinish(client.state, serverSide.reply);
+      const serverSession = PRAETOR.serverFinish(serverSide.state, clientSide.confirm);
+      const sameKeys = PRAETOR.hex(clientSide.session.sendChain) === PRAETOR.hex(serverSession.recvChain);
+      const sameSession = PRAETOR.hex(clientSide.session.sessionId) === PRAETOR.hex(serverSession.sessionId);
+      out.handshake = sameKeys && sameSession;
+
+      const a = new PRAETOR.SecureChannel({ ...clientSide.session, cellSize: 512 });
+      const b = new PRAETOR.SecureChannel({ ...serverSession, cellSize: 512 });
+      const payload = PRAETOR.randomBytes(5000);
+      let received = null;
+      let cells = 0;
+      for (const cell of a.send(payload)) {
+        cells += 1;
+        const result = b.receive(cell);
+        if (result && result.data) received = result.data;
+      }
+      out.cells = cells;
+      out.channel = received !== null && PRAETOR.hex(received) === PRAETOR.hex(payload);
+
+      const key = PRAETOR.randomBytes(32);
+      const envelope = PRAETOR.psealSeal(key, text('browser envelope'), text('demo'));
+      out.envelopeBytes = envelope.length;
+      out.aead = PRAETOR.hex(PRAETOR.psealOpen(key, envelope, text('demo'))) === PRAETOR.hex(text('browser envelope'));
+
+      const container = PRAETOR.encryptBuffer(text('container parity'), key, { chunkSize: 1024 });
+      out.container = PRAETOR.hex(PRAETOR.decryptBuffer(container, key).plaintext) === PRAETOR.hex(text('container parity'));
+      out.ok = out.handshake && out.channel && out.aead && out.container;
+      return out;
+    } catch (err) {
+      out.ok = false;
+      out.error = err.message;
+      return out;
+    }
+  };
+
+  document.getElementById('run').addEventListener('click', () => {
+    const result = window.runPraetorDemo();
+    const pre = document.getElementById('self');
+    if (!result.ok) return display(pre, `FAIL: ${result.error ?? 'unknown'}`, false);
+    display(pre, [
+      `handshake + confirmations : ${result.handshake ? 'PASS' : 'FAIL'}`,
+      `fixed-cell channel         : ${result.channel ? 'PASS' : 'FAIL'} (${result.cells} cells for 5000 B at 512 B)`,
+      `PSEAL seal/open            : ${result.aead ? 'PASS' : 'FAIL'} (${result.envelopeBytes} B envelope)`,
+      `container buffer roundtrip : ${result.container ? 'PASS' : 'FAIL'}`,
+    ].join('\n'));
+  });
+
+  document.getElementById('seal').addEventListener('click', () => {
+    try {
+      const key = PRAETOR.randomBytes(32);
+      const plaintext = text(document.getElementById('input').value);
+      const envelope = PRAETOR.psealSeal(key, plaintext);
+      const opened = PRAETOR.psealOpen(key, envelope);
+      const matches = PRAETOR.hex(opened) === PRAETOR.hex(plaintext);
+      document.getElementById('meta').textContent = `${plaintext.length} B plaintext → ${envelope.length} B envelope`;
+      display(
+        document.getElementById('sealed'),
+        `ciphertext (hex, first 96 B):\n${PRAETOR.hex(envelope).slice(0, 192)}…\n\nreopened: ${new TextDecoder().decode(opened)}\n${matches ? 'PASS' : 'FAIL'}`,
+        matches,
+      );
+    } catch (err) {
+      display(document.getElementById('sealed'), `FAIL: ${err.message}`, false);
+    }
+  });
+</script>
+</body>
+</html>
