@@ -1,0 +1,17 @@
+{
+  "cpu": "same machine, single thread",
+  "handshake_ops_s": 5158.940508387792,
+  "implementation": "wireguard-boringtun-0.7.1",
+  "transport": [
+    {
+      "mib_s": 1124.5861522959551,
+      "ops_s": 1151576.219951058,
+      "size": 1024
+    },
+    {
+      "mib_s": 1491.8566187733345,
+      "ops_s": 26072.08409811447,
+      "size": 60000
+    }
+  ]
+}

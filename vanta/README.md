@@ -109,6 +109,15 @@ Measured on one Windows x64 machine, single-threaded: the JS reference seals
 at 423 MiB/s and completes 2,116 handshakes/s. See
 [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md) for the full tables.
 
+![VANTA/1 vs WireGuard](docs/benchmarks-vanta-vs-wireguard.svg)
+
+Against Cloudflare `boringtun` 0.7.1 (userspace WireGuard, same CPU, single
+thread): VANTA completes **2,691 handshakes/s** vs **5,159**, **148k 1 KiB
+roundtrips/s** vs **1.15M**, and **143.7 MiB/s** at 60 KB vs **1,491.9 MiB/s**.
+This is protocol CPU cost, not a kernel-tunnel wall-clock test; VANTA pays for
+SIV, commitment, fixed cells and a post-quantum handshake. Full methodology:
+[`docs/BENCHMARKS.md`](docs/BENCHMARKS.md).
+
 Full byte-level specification: [`docs/DESIGN.md`](docs/DESIGN.md).
 Adversary analysis incl. rogue agents and mass coordination:
 [`docs/THREAT-MODEL.md`](docs/THREAT-MODEL.md).

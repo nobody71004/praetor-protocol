@@ -58,7 +58,14 @@ Single-threaded, Windows x64:
 | X-Wing decapsulation | 218 ops/s | 10,364 ops/s |
 | Full handshake | 86 ops/s | 2,116 ops/s |
 
-Full tables and methodology: [`vanta/docs/BENCHMARKS.md`](vanta/docs/BENCHMARKS.md).
+![VANTA/1 vs WireGuard](vanta/docs/benchmarks-vanta-vs-wireguard.svg)
+
+Against Cloudflare `boringtun` 0.7.1 (userspace WireGuard, same CPU, single
+thread): VANTA completes **2,691 handshakes/s** vs **5,159**, **148k 1 KiB
+roundtrips/s** vs **1.15M**, and **143.7 MiB/s** at 60 KB vs **1,491.9 MiB/s**.
+This is protocol CPU cost, not a kernel-tunnel wall-clock test; VANTA pays for
+SIV, commitment, fixed cells and a post-quantum handshake. Full methodology:
+[`vanta/docs/BENCHMARKS.md`](vanta/docs/BENCHMARKS.md).
 
 ## Documentation
 
