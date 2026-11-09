@@ -1,6 +1,6 @@
 {
   "name": "praetor-command",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "PRAETOR Command — desktop control plane, agent fabric, and local MCP computer-use server.",
   "private": true,
   "type": "module",

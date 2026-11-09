@@ -33,7 +33,7 @@ npm run icon       # regenerate build/icon.ico (only needed after changing the m
 npm run dist
 ```
 
-The portable application is written to `release/PRAETOR-Command-1.0.0.exe`. It is unsigned, so
+The portable application is written to `release/PRAETOR-Command-1.0.1.exe`. It is unsigned, so
 Windows SmartScreen may show a warning.
 
 If electron-builder cannot reach GitHub for its Windows toolsets, use a mirror:

@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/nobody71004/praetor-protocol/releases/tag/v1.0.0"><strong>DOWNLOAD PRAETOR COMMAND 1.0.0</strong></a>
+  <a href="https://github.com/nobody71004/praetor-protocol/releases/tag/v1.0.1"><strong>DOWNLOAD PRAETOR COMMAND 1.0.1</strong></a>
   &nbsp;·&nbsp;
   <a href="desktop/README.md">DESKTOP GUIDE</a>
   &nbsp;·&nbsp;
@@ -191,39 +191,39 @@ BOLT's fixed-cell channel measured **4,165.2 MiB/s** at 1 KiB and **6,246.8 MiB/
 
 ### Step 1 — Download the portable EXE
 
-Open the [v1.0.0 release](https://github.com/nobody71004/praetor-protocol/releases/tag/v1.0.0) and download:
+Open the [v1.0.1 release](https://github.com/nobody71004/praetor-protocol/releases/tag/v1.0.1) and download:
 
 ```text
-PRAETOR-Command-1.0.0.exe
+PRAETOR-Command-1.0.1.exe
 ```
 
 Or from PowerShell:
 
 ```powershell
 Invoke-WebRequest `
-  -Uri "https://github.com/nobody71004/praetor-protocol/releases/download/v1.0.0/PRAETOR-Command-1.0.0.exe" `
-  -OutFile "PRAETOR-Command-1.0.0.exe"
+  -Uri "https://github.com/nobody71004/praetor-protocol/releases/download/v1.0.1/PRAETOR-Command-1.0.1.exe" `
+  -OutFile "PRAETOR-Command-1.0.1.exe"
 ```
 
 ### Step 2 — Verify the download
 
 ```powershell
-Get-FileHash .\PRAETOR-Command-1.0.0.exe -Algorithm SHA256
+Get-FileHash .\PRAETOR-Command-1.0.1.exe -Algorithm SHA256
 ```
 
 Expected SHA-256:
 
 ```text
-330efb4e3d000e8bcca5766b1ac7ed4eba86cf03e2730e52f4a5841563d79e6c
+53dddcc3b880a7e4b2d0805618ae7e98aa858131311f9729665d4e68266f3e72
 ```
 
-Expected size: `80,679,566` bytes.
+Expected size: `80,679,943` bytes.
 
 The EXE is unsigned. If SmartScreen appears, choose **More info → Run anyway** only after verifying the hash above.
 
 ### Step 3 — Launch and connect
 
-1. Run `PRAETOR-Command-1.0.0.exe`. It is portable; there is no installer.
+1. Run `PRAETOR-Command-1.0.1.exe`. It is portable; there is no installer.
 2. On first launch, the app seeds four profiles: **Nexus PSEAL**, **Nexus FAST**, **Nexus BOLT**, and **Nexus PMARINE**.
 3. Select **Nexus PSEAL** on the Overview page.
 4. Press **Connect**.
@@ -370,7 +370,7 @@ npm run dist
 Output:
 
 ```text
-desktop/release/PRAETOR-Command-1.0.0.exe
+desktop/release/PRAETOR-Command-1.0.1.exe
 ```
 
 To regenerate the application icon after changing the mark:
@@ -629,8 +629,8 @@ Last verified: **2026-11-09**, Windows x64, release build.
 | Renderer production build | Passed |
 | Packaged `app.asar` profile seed | Four profiles, schema 4 |
 | Schema-3 → schema-4 migration | PMARINE injected and persisted once |
-| Portable EXE packaged | `PRAETOR-Command-1.0.0.exe`, 80,679,566 bytes |
-| Release asset digest | `sha256:330efb4e3d000e8bcca5766b1ac7ed4eba86cf03e2730e52f4a5841563d79e6c` |
+| Portable EXE packaged | `PRAETOR-Command-1.0.1.exe`, 80,679,943 bytes |
+| Release asset digest | `sha256:53dddcc3b880a7e4b2d0805618ae7e98aa858131311f9729665d4e68266f3e72` |
 | Real TCP egress | PSEAL handshake and SOCKS5 traffic verified against a self-hosted test exit |
 
 The protocol tests cover roundtrips, tamper rejection, replay rejection, padding, key separation, handshake impersonation, KEM implicit rejection, guard policy, audit-chain tampering, Shamir custody, proof-of-work admission, and the PMARINE channel geometry.
